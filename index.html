@@ -176,6 +176,17 @@
       padding: 0.3rem 0.5rem;
       font-size: 0.9rem;
     }
+
+    /* Styling for edit icon in each row */
+    .edit-icon {
+      font-size: 1.2em;
+      cursor: pointer;
+      color: #0066a3;
+      margin-left: 0.5rem;
+    }
+    .edit-icon:hover {
+      color: #004d80;
+    }
   </style>
 </head>
 <body>
@@ -219,7 +230,7 @@
             <option value="Semiannually">Semiannually</option>
             <option value="Annually">Annually</option>
           </select>
-          <button id="edit-mode-btn" type="button">Edit Tasks</button>
+          <!-- Removed global Edit Tasks button; editing is now per-row -->
           <button id="add-task-btn" type="button">Add Task</button>
         </div>
         <table id="task-table">
@@ -231,7 +242,8 @@
               <th>Periodicity</th>
               <th>Due Date</th>
               <th>Completed By</th>
-              <th>Verified By</th>
+            <th>Verified By</th>
+            <th>Actions</th>
             </tr>
           </thead>
           <tbody></tbody>

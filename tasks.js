@@ -11,8 +11,8 @@ let currentDate;
 let currentView;
 // Current periodicity filter ("All" means no filter)
 let currentFilter = 'All';
-// Flag indicating whether the task list is in edit mode
-let editingMode = false;
+// Index of the row currently being edited (null if none)
+let editingRowIndex = null;
 
 /**
  * Initialize the application.  Builds the task list, sets up event handlers
@@ -43,13 +43,7 @@ function initializeApp(tasksData) {
     });
   }
 
-  // Set up edit mode toggle
-  const editBtn = document.getElementById('edit-mode-btn');
-  if (editBtn) {
-    editBtn.addEventListener('click', () => {
-      toggleEditMode(tasksData);
-    });
-  }
+  // No global edit button; editing is handled per-row
 
   // Set up add-task button
   const addBtn = document.getElementById('add-task-btn');
@@ -121,9 +115,11 @@ function buildTaskList(tasksData) {
     const idxTd = document.createElement('td');
     idxTd.textContent = idx + 1;
     row.appendChild(idxTd);
+    // Determine if this row is currently being edited
+    const isEditing = editingRowIndex === idx;
     // Policy
     const policyTd = document.createElement('td');
-    if (editingMode) {
+    if (isEditing) {
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.value = task.policy;
@@ -137,7 +133,7 @@ function buildTaskList(tasksData) {
     row.appendChild(policyTd);
     // Task description
     const taskTd = document.createElement('td');
-    if (editingMode) {
+    if (isEditing) {
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.value = task.task;
@@ -151,7 +147,7 @@ function buildTaskList(tasksData) {
     row.appendChild(taskTd);
     // Periodicity
     const perTd = document.createElement('td');
-    if (editingMode) {
+    if (isEditing) {
       const sel = document.createElement('select');
       const options = ['Daily','Weekly','Monthly','Quarterly','Semiannually','Annually'];
       options.forEach(opt => {
@@ -163,8 +159,7 @@ function buildTaskList(tasksData) {
       });
       sel.addEventListener('change', (e) => {
         tasksData[idx].periodicity = e.target.value;
-        // After editing periodicity, re-apply filter and update calendar
-        applyFilter();
+        // Update calendar after editing periodicity
         renderCalendar(tasksData);
       });
       perTd.appendChild(sel);
@@ -174,7 +169,7 @@ function buildTaskList(tasksData) {
     row.appendChild(perTd);
     // Due date
     const dueTd = document.createElement('td');
-    if (editingMode) {
+    if (isEditing) {
       const inp = document.createElement('input');
       inp.type = 'date';
       inp.value = task.due_date;
@@ -211,6 +206,25 @@ function buildTaskList(tasksData) {
     });
     verTd.appendChild(verInput);
     row.appendChild(verTd);
+    // Actions cell: edit or finish button
+    const actionTd = document.createElement('td');
+    if (isEditing) {
+      const finishBtn = document.createElement('button');
+      finishBtn.textContent = 'Finish';
+      finishBtn.addEventListener('click', () => {
+        finishEditRow(idx);
+      });
+      actionTd.appendChild(finishBtn);
+    } else {
+      const editIcon = document.createElement('span');
+      editIcon.className = 'edit-icon';
+      editIcon.innerHTML = '&#9998;';
+      editIcon.addEventListener('click', () => {
+        startEditRow(idx);
+      });
+      actionTd.appendChild(editIcon);
+    }
+    row.appendChild(actionTd);
     tbody.appendChild(row);
     // Store row for highlighting later
     rowElements[idx] = row;
@@ -228,8 +242,9 @@ function applyFilter() {
   // rowElements array is aligned with tasksData indices
   rowElements.forEach((row, idx) => {
     if (!row) return;
+    // tasksData is a global array defined below
     const task = tasksData[idx];
-    const show = currentFilter === 'All' || (task && task.periodicity === currentFilter);
+    const show = (currentFilter === 'All' || (task && task.periodicity === currentFilter)) || (editingRowIndex === idx);
     row.style.display = show ? '' : 'none';
   });
 }
@@ -241,23 +256,9 @@ function applyFilter() {
  *
  * @param {Array} tasksData Array of task objects
  */
+// Not used: editing is now per-row
 function toggleEditMode(tasksData) {
-  editingMode = !editingMode;
-  const editBtn = document.getElementById('edit-mode-btn');
-  if (editingMode) {
-    editBtn.textContent = 'Save Changes';
-  } else {
-    editBtn.textContent = 'Edit Tasks';
-    // Persist updated tasks to localStorage for future sessions
-    try {
-      localStorage.setItem('customTasks', JSON.stringify(tasksData));
-    } catch (e) {
-      // ignore storage errors
-    }
-  }
-  // Rebuild the task list and apply filter/calendar updates
-  buildTaskList(tasksData);
-  renderCalendar(tasksData);
+  // no-op
 }
 
 /**
@@ -267,12 +268,6 @@ function toggleEditMode(tasksData) {
  * @param {Array} tasksData Array of task objects
  */
 function addTaskRow(tasksData) {
-  if (!editingMode) {
-    // Switch to edit mode first so that inputs appear
-    editingMode = true;
-    const editBtn = document.getElementById('edit-mode-btn');
-    if (editBtn) editBtn.textContent = 'Save Changes';
-  }
   // Create a new task object with default values
   const today = new Date();
   const yyyy = today.getFullYear();
@@ -287,7 +282,8 @@ function addTaskRow(tasksData) {
     verified_by: ''
   };
   tasksData.push(newTask);
-  // Rebuild list and calendar
+  // Start editing the newly added row
+  editingRowIndex = tasksData.length - 1;
   buildTaskList(tasksData);
   renderCalendar(tasksData);
 }
@@ -379,6 +375,43 @@ function highlightRow(index) {
     row.classList.add('highlight');
     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+}
+
+/**
+ * Begin editing the specified row.  Sets the editingRowIndex and rebuilds
+ * the list to display input fields for that row.  Any existing editing row
+ * will be discarded without saving changes.
+ *
+ * @param {number} index Row index to edit
+ */
+function startEditRow(index) {
+  editingRowIndex = index;
+  buildTaskList(tasksData);
+  // Ensure the row is visible when editing begins
+  if (rowElements[index]) {
+    rowElements[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+/**
+ * Finish editing a row.  Clears the editingRowIndex, saves the updated
+ * tasksData to localStorage, rebuilds the list, and re-renders the calendar.
+ *
+ * @param {number} index Row index being edited
+ */
+function finishEditRow(index) {
+  // Clear editing state
+  editingRowIndex = null;
+  // Persist tasksData modifications
+  try {
+    localStorage.setItem('customTasks', JSON.stringify(tasksData));
+  } catch (e) {
+    // ignore storage errors
+  }
+  // Rebuild list and update filter
+  buildTaskList(tasksData);
+  // Re-render calendar to reflect changes
+  renderCalendar(tasksData);
 }
 
 /**
