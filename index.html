@@ -39,6 +39,10 @@
       flex-direction: column;
       align-items: stretch;
       padding: 1rem 0;
+      /* Keep the side panel visible while scrolling */
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
     }
     #sidebar button {
       margin: 0.5rem 1rem;
@@ -167,6 +171,12 @@
       flex-wrap: wrap;
       align-items: center;
       gap: 0.5rem;
+      /* Make the filter and add buttons stick to the top while scrolling */
+      position: sticky;
+      top: 0;
+      background-color: #fff;
+      padding: 0.5rem 0;
+      z-index: 10;
     }
     .list-controls label {
       font-weight: bold;
