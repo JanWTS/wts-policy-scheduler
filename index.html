@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <titlWTS-Policy-Schedulerler</title>
+  <title>WTS-Policy-Scheduler</title>
   <!--
     Note: We intentionally avoid external dependencies such as FullCalendar here because
     the application must run offline.  A simple month grid is implemented in
@@ -159,11 +159,29 @@
     tr.highlight {
       background-color: #fff9c4 !important;
     }
+
+    /* Controls above the task list for filtering and editing */
+    .list-controls {
+      margin: 0.5rem 0 1rem 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .list-controls label {
+      font-weight: bold;
+    }
+    .list-controls select,
+    .list-controls button {
+      padding: 0.3rem 0.5rem;
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>WTWTS-Policy-Scheduler</h1>
+    <!-- Updated header title to fix typo and simplify name -->
+    <h1>WTS-Policy-Scheduler</h1>
     <p>Track periodic tasks across all policies and stay up to date</p>
   </header>
   <div class="layout">
@@ -189,6 +207,21 @@
       <div id="list-view" class="view-section">
         <h2>Policy Task List</h2>
         <p>Enter the names of the person completing each task and the verifier. Your entries will be stored in your browser.</p>
+        <!-- Controls for filtering and editing tasks -->
+        <div class="list-controls">
+          <label for="periodicityFilter">Filter by periodicity:</label>
+          <select id="periodicityFilter">
+            <option value="All">All</option>
+            <option value="Daily">Daily</option>
+            <option value="Weekly">Weekly</option>
+            <option value="Monthly">Monthly</option>
+            <option value="Quarterly">Quarterly</option>
+            <option value="Semiannually">Semiannually</option>
+            <option value="Annually">Annually</option>
+          </select>
+          <button id="edit-mode-btn" type="button">Edit Tasks</button>
+          <button id="add-task-btn" type="button">Add Task</button>
+        </div>
         <table id="task-table">
           <thead>
             <tr>

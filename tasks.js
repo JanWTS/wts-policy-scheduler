@@ -9,6 +9,10 @@ let saved = {};
 let rowElements = [];
 let currentDate;
 let currentView;
+// Current periodicity filter ("All" means no filter)
+let currentFilter = 'All';
+// Flag indicating whether the task list is in edit mode
+let editingMode = false;
 
 /**
  * Initialize the application.  Builds the task list, sets up event handlers
@@ -26,6 +30,34 @@ function initializeApp(tasksData) {
   }
   // Build the task list and store row elements for quick access
   buildTaskList(tasksData);
+
+  // Set up periodicity filter control
+  const filterSelect = document.getElementById('periodicityFilter');
+  if (filterSelect) {
+    filterSelect.value = currentFilter;
+    filterSelect.addEventListener('change', (e) => {
+      currentFilter = e.target.value;
+      applyFilter();
+      // re-render calendar with current filter applied
+      renderCalendar(tasksData);
+    });
+  }
+
+  // Set up edit mode toggle
+  const editBtn = document.getElementById('edit-mode-btn');
+  if (editBtn) {
+    editBtn.addEventListener('click', () => {
+      toggleEditMode(tasksData);
+    });
+  }
+
+  // Set up add-task button
+  const addBtn = document.getElementById('add-task-btn');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      addTaskRow(tasksData);
+    });
+  }
   // Set up navigation between calendar and list views
   const navCal = document.getElementById('nav-calendar');
   const navList = document.getElementById('nav-list');
@@ -91,19 +123,69 @@ function buildTaskList(tasksData) {
     row.appendChild(idxTd);
     // Policy
     const policyTd = document.createElement('td');
-    policyTd.textContent = task.policy;
+    if (editingMode) {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = task.policy;
+      inp.addEventListener('input', (e) => {
+        tasksData[idx].policy = e.target.value;
+      });
+      policyTd.appendChild(inp);
+    } else {
+      policyTd.textContent = task.policy;
+    }
     row.appendChild(policyTd);
     // Task description
     const taskTd = document.createElement('td');
-    taskTd.textContent = task.task;
+    if (editingMode) {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = task.task;
+      inp.addEventListener('input', (e) => {
+        tasksData[idx].task = e.target.value;
+      });
+      taskTd.appendChild(inp);
+    } else {
+      taskTd.textContent = task.task;
+    }
     row.appendChild(taskTd);
     // Periodicity
     const perTd = document.createElement('td');
-    perTd.textContent = task.periodicity;
+    if (editingMode) {
+      const sel = document.createElement('select');
+      const options = ['Daily','Weekly','Monthly','Quarterly','Semiannually','Annually'];
+      options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        if (task.periodicity === opt) option.selected = true;
+        sel.appendChild(option);
+      });
+      sel.addEventListener('change', (e) => {
+        tasksData[idx].periodicity = e.target.value;
+        // After editing periodicity, re-apply filter and update calendar
+        applyFilter();
+        renderCalendar(tasksData);
+      });
+      perTd.appendChild(sel);
+    } else {
+      perTd.textContent = task.periodicity;
+    }
     row.appendChild(perTd);
     // Due date
     const dueTd = document.createElement('td');
-    dueTd.textContent = task.due_date;
+    if (editingMode) {
+      const inp = document.createElement('input');
+      inp.type = 'date';
+      inp.value = task.due_date;
+      inp.addEventListener('change', (e) => {
+        tasksData[idx].due_date = e.target.value;
+        renderCalendar(tasksData);
+      });
+      dueTd.appendChild(inp);
+    } else {
+      dueTd.textContent = task.due_date;
+    }
     row.appendChild(dueTd);
     // Completed By input
     const compTd = document.createElement('td');
@@ -133,6 +215,81 @@ function buildTaskList(tasksData) {
     // Store row for highlighting later
     rowElements[idx] = row;
   });
+  // Apply filter to show/hide rows based on current selection
+  applyFilter();
+}
+
+/**
+ * Show or hide rows in the task list based on the current periodicity filter.
+ * When the filter is "All" every row is shown. Otherwise rows whose
+ * tasks' periodicity does not match the filter are hidden.
+ */
+function applyFilter() {
+  // rowElements array is aligned with tasksData indices
+  rowElements.forEach((row, idx) => {
+    if (!row) return;
+    const task = tasksData[idx];
+    const show = currentFilter === 'All' || (task && task.periodicity === currentFilter);
+    row.style.display = show ? '' : 'none';
+  });
+}
+
+/**
+ * Toggle edit mode for the task list. In edit mode the policy, task,
+ * periodicity and due date cells become editable inputs. When edit mode
+ * is toggled off, changes are saved to localStorage and the list is rebuilt.
+ *
+ * @param {Array} tasksData Array of task objects
+ */
+function toggleEditMode(tasksData) {
+  editingMode = !editingMode;
+  const editBtn = document.getElementById('edit-mode-btn');
+  if (editingMode) {
+    editBtn.textContent = 'Save Changes';
+  } else {
+    editBtn.textContent = 'Edit Tasks';
+    // Persist updated tasks to localStorage for future sessions
+    try {
+      localStorage.setItem('customTasks', JSON.stringify(tasksData));
+    } catch (e) {
+      // ignore storage errors
+    }
+  }
+  // Rebuild the task list and apply filter/calendar updates
+  buildTaskList(tasksData);
+  renderCalendar(tasksData);
+}
+
+/**
+ * Add a blank task row. If not currently in edit mode, switch to edit mode first.
+ * New tasks default to empty policy/task, monthly periodicity and today's date.
+ *
+ * @param {Array} tasksData Array of task objects
+ */
+function addTaskRow(tasksData) {
+  if (!editingMode) {
+    // Switch to edit mode first so that inputs appear
+    editingMode = true;
+    const editBtn = document.getElementById('edit-mode-btn');
+    if (editBtn) editBtn.textContent = 'Save Changes';
+  }
+  // Create a new task object with default values
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const newTask = {
+    policy: '',
+    task: '',
+    periodicity: 'Monthly',
+    due_date: `${yyyy}-${mm}-${dd}`,
+    completed_by: '',
+    verified_by: ''
+  };
+  tasksData.push(newTask);
+  // Rebuild list and calendar
+  buildTaskList(tasksData);
+  renderCalendar(tasksData);
 }
 
 /**
@@ -254,6 +411,8 @@ function renderCalendar(tasksData) {
     // Build tasksByDate map for this month
     const tasksByDate = {};
     tasksData.forEach((task, idx) => {
+      // Apply current filter before adding to calendar
+      if (currentFilter !== 'All' && task.periodicity !== currentFilter) return;
       if (!task.due_date) return;
       const d = new Date(task.due_date + 'T00:00:00');
       if (d.getFullYear() === currentDate.getFullYear() && d.getMonth() === currentDate.getMonth()) {
@@ -325,6 +484,8 @@ function renderCalendar(tasksData) {
     // Build tasksByDate for this week
     const tasksByDate = {};
     tasksData.forEach((task, idx) => {
+      // Apply filter
+      if (currentFilter !== 'All' && task.periodicity !== currentFilter) return;
       if (!task.due_date) return;
       const d = new Date(task.due_date + 'T00:00:00');
       if (d >= startOfWeek && d <= endOfWeek) {
@@ -379,6 +540,9 @@ function renderCalendar(tasksData) {
     // Find tasks for this day
     const tasksForDay = [];
     tasksData.forEach((task, idx) => {
+      // Apply filter
+      if (currentFilter !== 'All' && task.periodicity !== currentFilter) return;
+      if (!task.due_date) return;
       const d = new Date(task.due_date + 'T00:00:00');
       if (
         d.getFullYear() === currentDate.getFullYear() &&
@@ -844,7 +1008,19 @@ eSI6ICJxdWFydGVybHkiLAogICAgImR1ZV9kYXRlIjogIjIwMjYtMDItMDUiLAogICAgImNvbXBsZXRl
 IiIKICB9Cl0=
 `;
 const jsonStr = atob(base64Tasks.replace(/\s+/g, ''));
-const tasksData = JSON.parse(jsonStr);
+let tasksData = JSON.parse(jsonStr);
+// Override tasksData with any custom tasks stored in localStorage.
+try {
+  const stored = localStorage.getItem('customTasks');
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    if (Array.isArray(parsed)) {
+      tasksData = parsed;
+    }
+  }
+} catch (e) {
+  // ignore JSON parse/storage errors
+}
 
 // Initialize the application when the DOM is ready.  If the DOM has already
 // loaded by the time this script runs, initialize immediately; otherwise
