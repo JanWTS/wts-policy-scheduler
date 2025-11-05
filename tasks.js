@@ -9,7 +9,8 @@ let saved = {};
 let rowElements = [];
 let currentDate;
 let currentView;
-// Current periodicity filter ("All" means no filter)
+// Current periodicity filter ("All" means no filter).  We use uppercase
+// values for periodicity to avoid case sensitivity issues.
 let currentFilter = 'All';
 // Index of the row currently being edited (null if none)
 let editingRowIndex = null;
@@ -149,7 +150,7 @@ function buildTaskList(tasksData) {
     const perTd = document.createElement('td');
     if (isEditing) {
       const sel = document.createElement('select');
-      const options = ['Daily','Weekly','Monthly','Quarterly','Semiannually','Annually'];
+      const options = ['DAILY','WEEKLY','MONTHLY','QUARTERLY','SEMIANNUALLY','ANNUALLY'];
       options.forEach(opt => {
         const option = document.createElement('option');
         option.value = opt;
@@ -215,6 +216,27 @@ function buildTaskList(tasksData) {
         finishEditRow(idx);
       });
       actionTd.appendChild(finishBtn);
+      // Add delete button next to finish when editing
+      const deleteBtn = document.createElement('button');
+      deleteBtn.innerHTML = '&#128465;'; // trashcan icon
+      deleteBtn.style.marginLeft = '0.3rem';
+      deleteBtn.addEventListener('click', () => {
+        // Show confirmation before deleting
+        const confirmDelete = window.confirm('Are you sure you want to delete this entry?');
+        if (confirmDelete) {
+          // Remove the task from the array
+          tasksData.splice(idx, 1);
+          editingRowIndex = null;
+          // Persist changes
+          try {
+            localStorage.setItem('customTasks', JSON.stringify(tasksData));
+          } catch (e) {}
+          // Rebuild list and update calendar
+          buildTaskList(tasksData);
+          renderCalendar(tasksData);
+        }
+      });
+      actionTd.appendChild(deleteBtn);
     } else {
       const editIcon = document.createElement('span');
       editIcon.className = 'edit-icon';
@@ -276,7 +298,7 @@ function addTaskRow(tasksData) {
   const newTask = {
     policy: '',
     task: '',
-    periodicity: 'Monthly',
+    periodicity: 'MONTHLY',
     due_date: `${yyyy}-${mm}-${dd}`,
     completed_by: '',
     verified_by: ''
@@ -286,6 +308,13 @@ function addTaskRow(tasksData) {
   editingRowIndex = tasksData.length - 1;
   buildTaskList(tasksData);
   renderCalendar(tasksData);
+  // Scroll to the newly added row so the user can see it
+  setTimeout(() => {
+    const newRow = rowElements[editingRowIndex];
+    if (newRow) {
+      newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 0);
 }
 
 /**
@@ -1042,6 +1071,12 @@ IiIKICB9Cl0=
 `;
 const jsonStr = atob(base64Tasks.replace(/\s+/g, ''));
 let tasksData = JSON.parse(jsonStr);
+// Normalize periodicity values to uppercase for consistency
+tasksData.forEach((task) => {
+  if (task.periodicity) {
+    task.periodicity = task.periodicity.toString().toUpperCase();
+  }
+});
 // Override tasksData with any custom tasks stored in localStorage.
 try {
   const stored = localStorage.getItem('customTasks');
@@ -1049,6 +1084,12 @@ try {
     const parsed = JSON.parse(stored);
     if (Array.isArray(parsed)) {
       tasksData = parsed;
+      // Normalize periodicity on loaded custom tasks
+      tasksData.forEach((task) => {
+        if (task.periodicity) {
+          task.periodicity = task.periodicity.toString().toUpperCase();
+        }
+      });
     }
   }
 } catch (e) {
