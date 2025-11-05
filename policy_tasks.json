@@ -1,0 +1,906 @@
+[
+  {
+    "policy": "Access Control Policy",
+    "task": "Role assignments are revalidated quarterly.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Access Control Policy",
+    "task": "Visitor logs are reviewed monthly by the CISO and retained per the",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Access Control Policy",
+    "task": "Quarterly review of all privileged accounts",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Access Control Policy",
+    "task": "Semi-annual review of user access to CUI repositories",
+    "periodicity": "semiannually",
+    "due_date": "2026-05-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Access Control Policy",
+    "task": "Annual review of all access groups and administrative roles",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Access Control Policy",
+    "task": "and collaboration resources necessary for daily work. Standard users",
+    "periodicity": "daily",
+    "due_date": "2025-11-06",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Access Control Policy",
+    "task": "twice annually to confirm compliance with the principle of least",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Access Control Policy",
+    "task": "Spreadsheet and discussed in quarterly risk meetings.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Asset Management Policy",
+    "task": "Inventory is reviewed quarterly by the IT Asset and Configuration",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Asset Management Policy",
+    "task": "offboarding, and quarterly audits.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "2. Policy",
+    "task": "quarterly and after significant changes or security incidents. The",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "2. Policy",
+    "task": "weekly) and upon high-severity alerts; record findings and actions",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Awareness & Training Policy",
+    "task": "access and on an ongoing basis thereafter (e.g., at least annually and",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Awareness & Training Policy",
+    "task": "onboarding windows, upon role changes, and at least annually thereafter.",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Awareness & Training Policy",
+    "task": "NKO) as the baseline annual awareness module for all personnel with DoD",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Awareness & Training Policy",
+    "task": "Annual refresher: Complete assigned modules every 12 months (including",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Awareness & Training Policy",
+    "task": "and will report results at least quarterly to leadership.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Awareness & Training Policy",
+    "task": "Training content shall be reviewed at least annually and after major",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Awareness & Training Policy",
+    "task": "checklists; annual refresher scheduling; phishing simulation cadence and",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Configuration Management Policy",
+    "task": "Quarterly configuration audits will be conducted by the IT Asset and",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Configuration Management Policy",
+    "task": "Scheduled cadence (quarterly).",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Desktop Computer Security Policy",
+    "task": "Reconcile inventory quarterly via network discovery scans and",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Desktop Computer Security Policy",
+    "task": "Review and update baseline images at least semiannually through the",
+    "periodicity": "semiannually",
+    "due_date": "2026-05-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Desktop Computer Security Policy",
+    "task": "Perform vulnerability scans weekly; generate remediation tickets",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Desktop Computer Security Policy",
+    "task": "Schedule quick scans at every login and full scans weekly.",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Desktop Computer Security Policy",
+    "task": "Use your standard user account for daily work. Never borrow someone",
+    "periodicity": "daily",
+    "due_date": "2025-11-06",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Desktop Computer Security Policy",
+    "task": "Review all local and domain group memberships quarterly; disable",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Desktop Computer Security Policy",
+    "task": "Run daily correlation rules and weekly threat hunting queries;",
+    "periodicity": "daily",
+    "due_date": "2025-11-06",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Desktop Computer Security Policy",
+    "task": "Document all approved exceptions and review them quarterly.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Email Usage Policy",
+    "task": "these policies during onboarding and as part of the annual",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Email Usage Policy",
+    "task": "Security team will review logs weekly and investigate anomalies",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Incident Response Policy",
+    "task": "Physical tamper seal broken on desktop / server   Quarterly inspection reveals broken seal, missing screw, tool marks   SEV3       Hardware quarantined within 4\u00a0hours                        Inspect for hardware implants; capture photographs for chain of custody.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Internet\u00a0Usage\u00a0Policy",
+    "task": "Logs are retained for 180\u00a0days and reviewed quarterly for anomalies.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Internet\u00a0Usage\u00a0Policy",
+    "task": "Compliance\u00a0Officer      Audit adherence, coordinate with contracts/legal, update policy annually.",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Laptop Security Policy",
+    "task": "3.  Annual Audit \u2013 Each October, Line Managers confirm physical",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Laptop Security Policy",
+    "task": "Medium/Low          30\u00a0days    Monthly patch report",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Laptop Security Policy",
+    "task": "Standard accounts for daily work.",
+    "periodicity": "daily",
+    "due_date": "2025-11-06",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Laptop Security Policy",
+    "task": "Compliance audits 15\u00a0% of laptop fleet semiannually.",
+    "periodicity": "semiannually",
+    "due_date": "2026-05-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Laptop Security Policy",
+    "task": "Managers                            Ensure team laptops are secured and audited annually.",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Licensing Compliance Policy",
+    "task": "exceed licensed entitlements; quarterly reviews correct",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Licensing Compliance Policy",
+    "task": "Quarterly Reconciliation \u2013 The IT Asset and Configuration Manager",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Licensing Compliance Policy",
+    "task": "Periodic Compliance Review \u2013 Quarterly (or more often if risk",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Licensing Compliance Policy",
+    "task": "2.  Third party hosted applications that process WTS data require annual",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Licensing Compliance Policy",
+    "task": "Director of Operations    Maintain LI, perform quarterly reconciliations, manage renewals. Procure licenses, negotiate contracts, track spend. Approve software requests, validate continued need, and budget renewals.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Mobile Device Policy",
+    "task": "retire). Reconcile records monthly against carrier invoices and",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Mobile Device Policy",
+    "task": "Perform quarterly spot checks; devices not physically verified",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Mobile Device Policy",
+    "task": "Retain mobile logs for at least 180 days. WTS ISSO reviews weekly",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Mobile Device Policy",
+    "task": "After each annual refresher or material policy revision, users must",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Mobile Device Policy",
+    "task": "System Administrator   Enroll and retire devices; push profiles, apps, certificates, and patches; maintain inventory; generate compliance dashboards. Monitor Intune telemetry in Azure, investigate alerts, coordinate incident containment, and provide daily metrics to leadership",
+    "periodicity": "daily",
+    "due_date": "2025-11-06",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Mobile Device Policy",
+    "task": "Compliance Officer     Conduct bi-annual audits of Intune compliance data, review exception processes, update policy to reflect regulatory changes, and brief senior management.",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Payment Card Security Policy",
+    "task": "generate a retention audit report weekly.",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Payment Card Security Policy",
+    "task": "Review and reconcile access lists monthly against HR records;",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Payment Card Security Policy",
+    "task": "a Hardware Security Module (HSM). Rotate encryption keys annually or",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Payment Card Security Policy",
+    "task": "Perform quarterly network segmentation penetration tests to verify",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Payment Card Security Policy",
+    "task": "Review daily automated alerts for anomalies; perform manual log",
+    "periodicity": "daily",
+    "due_date": "2025-11-06",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Payment Card Security Policy",
+    "task": "review of payment systems weekly and file findings.",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Payment Card Security Policy",
+    "task": "Perform annual risk assessments and SOC\u00a02 / PCI evidence reviews of",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "2.10. Company Credit Card Usage Policy",
+    "task": "multiple cards\u2014to bypass per transaction or monthly limits.",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "2.10. Company Credit Card Usage Policy",
+    "task": "Set card limits (default $500\u00a0single / $1,000\u00a0monthly) and enable",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "2.10. Company Credit Card Usage Policy",
+    "task": "Reconcile statements monthly; flag out of policy charges, and",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "2.10. Company Credit Card Usage Policy",
+    "task": "Conduct quarterly audits of 10\u00a0% of cardholders for receipts.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "2.10. Company Credit Card Usage Policy",
+    "task": "Compliance Officer        Conduct quarterly self assessment, manage vendor attestations, audit policy adherence.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "1. Policy",
+    "task": "Main Entrance/Exit Door: Used for all daily employee access and",
+    "periodicity": "daily",
+    "due_date": "2025-11-06",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "1. Policy",
+    "task": "Visitor logs will be reviewed monthly by the CISO for anomalies and",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "|             | to          |             | \u2022\u00a0Quarterly |             |",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "|             |             |             | \u2022\u00a0Daily     |             |",
+    "periodicity": "daily",
+    "due_date": "2025-11-06",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "|             |             |             | \u2022\u00a0Quarterly |             |",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "|             |             |             | annual      |             |",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "Integrity Checks                   A quarterly script calculates SHA256 checksums for each archive set (>\u00a01\u00a0TB). Any mismatch triggers an alert for investigation.                                                                                                                                                     IT Operations",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "Disaster Recovery             Maintain a fallback set of critical documents.                                                                                    Duplicate originals of governance documents are kept in a geographically distant vault; an annual test confirms retrieval within 48\u00a0hours.",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "Annual third-party audit or report reviewed by Compliance.",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "distinct backup tiers so we can restore daily work quickly, recover from",
+    "periodicity": "daily",
+    "due_date": "2025-11-06",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "3.  Access reviews are performed quarterly by the Compliance Officer;",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "1.  Internal Audit \u2013 Annual sampling of 10\u00a0% of record series for",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Record Retention Policy",
+    "task": "3.  Policy Review \u2013 Compliance Officer chairs annual review; amendments",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "1.  Policy",
+    "task": "Weekly by the security/IT team",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "1.  Policy",
+    "task": "Monthly in compliance review sessions",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "1.  Policy",
+    "task": "Annually during full policy and system audits",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "1.  Policy",
+    "task": "The POAM is reviewed weekly to ensure accuracy, timeliness, and",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Social Media Policy",
+    "task": "IT Security reviews logs monthly for anomalies; Marketing reconciles",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Social Media Policy",
+    "task": "Compliance Officer       Conducts quarterly audits; confirms NIST/CMMC alignment; coordinates external assessments.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Software and Copyright Policy",
+    "task": "1.  Monthly Intune Scans detect unknown executables, browser extensions,",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "System and Information Security Policy",
+    "task": "Accounts must be reviewed quarterly, and inactive accounts must be",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "System and Information Security Policy",
+    "task": "Log reviews must occur monthly to detect anomalies or policy",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "System and Information Security Policy",
+    "task": "annually, or upon significant changes to the threat landscape or",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "System and Information Security Policy",
+    "task": "WTS will review encryption configurations at least annually to ensure",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "System and Information Security Policy",
+    "task": "annually thereafter.",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "System and Information Security Policy",
+    "task": "Restore procedures must be tested at least annually to verify system",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Systems Access and Security Policy",
+    "task": "\u2022 Weekly reconciliation between the HR roster and AD disables orphaned",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Systems Access and Security Policy",
+    "task": "on a quarterly basis.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Systems Access and Security Policy",
+    "task": "\u2022 The Security Team performs daily anomaly detection and submits monthly",
+    "periodicity": "daily",
+    "due_date": "2025-11-06",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Systems Access and Security Policy",
+    "task": "\u2022 Semi Annual Certification: System Administrator will revalidate every",
+    "periodicity": "semiannually",
+    "due_date": "2026-05-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Systems Access and Security Policy",
+    "task": "End User                                     Observe security policies, safeguard credentials, and report incidents promptly   Participate in quarterly access attestations",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Systems Access and Security Policy",
+    "task": "Manager                                      Initiate and approve ARF/CAR submissions; ensure access removal at departure      Review team access quarterly",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Systems Access and Security Policy",
+    "task": "System Owner                                 Validate necessity of requested rights and maintain rolepermission mappings       Lead semiannual certifications",
+    "periodicity": "semiannually",
+    "due_date": "2026-05-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Systems Access and Security Policy",
+    "task": "Network & System Administrator               Create, modify, and disable accounts; enforce MFA, vault, and password policies   Reconcile HR roster with AD weekly",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Systems Access and Security Policy",
+    "task": "Information System Security Officer (ISSO)   Monitor logs, manage session recordings, and investigate anomalies                Produce weekly anomaly reports",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Systems Access and Security Policy",
+    "task": "Chief Information Security Officer (CISO)    Own this policy, approve exceptions, and chair break glass reviews                Review policy effectiveness quarterly",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Text Message (SMS) Usage Policy",
+    "task": "subject to quarterly key management audits.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Text Message (SMS) Usage Policy",
+    "task": "IT Security reviews usage patterns weekly for anomalies such as",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Text Message (SMS) Usage Policy",
+    "task": "Compliance Officer   Perform semiannual audits; update policy; coordinate with legal on retention requirements.",
+    "periodicity": "semiannually",
+    "due_date": "2026-05-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "quarterly.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "Quarterly Reviews \u2013 Managers certify group memberships; Compliance",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "Managers           Approve initial access on the Access Request Form, validate least-privilege assignments during quarterly reviews, and request removal of access when duties change.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "The CISO and ISSO conduct quarterly access reviews of:",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "This plan will be reviewed annually by the CISO or executive leadership",
+    "periodicity": "annually",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "These secondary backups are updated monthly by the IT Asset and",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "Backup jobs are checked weekly to ensure successful",
+    "periodicity": "weekly",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "monthly to verify critical files are properly synced.",
+    "periodicity": "monthly",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "The IT Asset and Configuration Manager performs a quarterly test",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "and rotated quarterly.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "Tabletop exercises will be conducted semi-annually to simulate",
+    "periodicity": "semiannually",
+    "due_date": "2026-05-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "User Identification, Authentication and Privacy Policy",
+    "task": "Backup restore tests are logged and reviewed quarterly.",
+    "periodicity": "quarterly",
+    "due_date": "2026-02-05",
+    "completed_by": "",
+    "verified_by": ""
+  }
+]
