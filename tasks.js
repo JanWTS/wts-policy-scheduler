@@ -15,6 +15,204 @@ let currentFilter = 'All';
 // Index of the row currently being edited (null if none)
 let editingRowIndex = null;
 
+// List of completed tasks. Each record stores the task index, policy, task name,
+// the due date of the occurrence, who completed it, who verified it, and the
+// date it was completed.  This array is loaded from and saved to localStorage.
+let completedTasks = [];
+
+/**
+ * Compute the next due date for a task based on its periodicity.
+ *
+ * @param {string} dateStr Current due date in YYYY-MM-DD format
+ * @param {string} periodicity One of DAILY, WEEKLY, MONTHLY, QUARTERLY, SEMIANNUALLY, ANNUALLY, OTHER
+ * @returns {string|null} The next due date in YYYY-MM-DD format, or null if the task does not repeat
+ */
+function getNextDueDate(dateStr, periodicity) {
+  const d = new Date(dateStr + 'T00:00:00');
+  switch (periodicity) {
+    case 'DAILY':
+      d.setDate(d.getDate() + 1);
+      break;
+    case 'WEEKLY':
+      d.setDate(d.getDate() + 7);
+      break;
+    case 'MONTHLY':
+      d.setMonth(d.getMonth() + 1);
+      break;
+    case 'QUARTERLY':
+      d.setMonth(d.getMonth() + 3);
+      break;
+    case 'SEMIANNUALLY':
+      d.setMonth(d.getMonth() + 6);
+      break;
+    case 'ANNUALLY':
+      d.setFullYear(d.getFullYear() + 1);
+      break;
+    default:
+      return null;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Generate all occurrences of a task within a given date range.  Uses the task's
+ * initial_due_date as the starting point and advances based on its periodicity.
+ * Tasks with periodicity OTHER generate only their initial date if it falls
+ * within the range.
+ *
+ * @param {Object} task Task object with initial_due_date and periodicity
+ * @param {Date} start Start date of the range (inclusive)
+ * @param {Date} end End date of the range (inclusive)
+ * @returns {Date[]} Array of Date objects representing each occurrence
+ */
+function generateOccurrences(task, start, end) {
+  const occurrences = [];
+  if (!task.initial_due_date) return occurrences;
+  const first = new Date(task.initial_due_date + 'T00:00:00');
+  // Handle tasks that do not repeat
+  if (task.periodicity === 'OTHER' || !getNextDueDate(task.initial_due_date, task.periodicity)) {
+    if (first >= start && first <= end) {
+      occurrences.push(first);
+    }
+    return occurrences;
+  }
+  // Advance to the first occurrence on or after the start date
+  let current = new Date(first);
+  while (current < start) {
+    const nextStr = getNextDueDate(current.toISOString().slice(0, 10), task.periodicity);
+    if (!nextStr) return occurrences;
+    current = new Date(nextStr + 'T00:00:00');
+  }
+  // Add occurrences within the range
+  while (current <= end) {
+    occurrences.push(new Date(current));
+    const nextStr = getNextDueDate(current.toISOString().slice(0, 10), task.periodicity);
+    if (!nextStr) break;
+    current = new Date(nextStr + 'T00:00:00');
+  }
+  return occurrences;
+}
+
+/**
+ * Determine whether a specific occurrence of a task has been completed.  Checks
+ * the completedTasks array for a record matching the task index and due date.
+ *
+ * @param {number} index Index of the task in tasksData
+ * @param {string} dueDateStr Occurrence date in YYYY-MM-DD format
+ * @returns {boolean} True if the occurrence has been completed, false otherwise
+ */
+function isTaskCompleted(index, dueDateStr) {
+  return completedTasks.some(rec => rec.index === index && rec.due_date === dueDateStr);
+}
+
+/**
+ * Mark a task occurrence as completed.  Records the completion in completedTasks,
+ * updates the task's next due date, persists data to localStorage, and refreshes
+ * the list and calendar views.
+ *
+ * @param {number} idx Index of the task in tasksData
+ */
+function completeTask(idx) {
+  const task = tasksData[idx];
+  const dueDate = task.due_date;
+  if (!dueDate) return;
+  // Capture names from saved status if available
+  const compName = saved[idx] ? saved[idx].completed_by || '' : '';
+  const verName = saved[idx] ? saved[idx].verified_by || '' : '';
+  const record = {
+    index: idx,
+    policy: task.policy,
+    task: task.task,
+    due_date: dueDate,
+    completed_by: compName,
+    verified_by: verName,
+    completed_date: new Date().toISOString().slice(0, 10)
+  };
+  completedTasks.push(record);
+  // Persist completed tasks
+  try {
+    localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
+  } catch (e) {}
+  // Compute next due date based on periodicity
+  const next = getNextDueDate(dueDate, task.periodicity);
+  if (next) {
+    tasksData[idx].due_date = next;
+  } else {
+    // If no next date (e.g. OTHER), clear the due_date so it no longer shows in the list
+    tasksData[idx].due_date = '';
+  }
+  // Persist updated tasks
+  try {
+    localStorage.setItem('customTasks', JSON.stringify(tasksData));
+  } catch (e) {}
+  // Refresh UI
+  buildTaskList(tasksData);
+  renderCalendar(tasksData);
+}
+
+/**
+ * Build or refresh the completed tasks table based on the current completedTasks
+ * array and the search input.  The table displays the most recent completed
+ * tasks first.
+ */
+function buildCompletedTable() {
+  const table = document.getElementById('completed-table');
+  if (!table) return;
+  // Clear table
+  table.innerHTML = '';
+  // Build header
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  ['Policy','Task','Due Date','Completed By','Verified By','Completed Date'].forEach(text => {
+    const th = document.createElement('th');
+    th.textContent = text;
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  // Fetch search filter
+  const searchInput = document.getElementById('completed-search');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  // Sort completed tasks by completed_date descending
+  const sorted = [...completedTasks].sort((a, b) => {
+    return b.completed_date.localeCompare(a.completed_date);
+  });
+  // Build body
+  const tbody = document.createElement('tbody');
+  sorted.forEach(rec => {
+    const combined = `${rec.policy} ${rec.task} ${rec.due_date} ${rec.completed_by} ${rec.verified_by} ${rec.completed_date}`.toLowerCase();
+    if (query && !combined.includes(query)) return;
+    const tr = document.createElement('tr');
+    [rec.policy, rec.task, rec.due_date, rec.completed_by, rec.verified_by, rec.completed_date].forEach(val => {
+      const td = document.createElement('td');
+      td.textContent = val || '';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+}
+
+/**
+ * Show the completed tasks view and hide other views.  Updates navigation states
+ * and rebuilds the completed tasks table.
+ */
+function showCompletedView() {
+  document.getElementById('calendar-view').classList.remove('active');
+  document.getElementById('list-view').classList.remove('active');
+  document.getElementById('inventory-view').classList.remove('active');
+  document.getElementById('members-view').classList.remove('active');
+  document.getElementById('completed-view').classList.add('active');
+  // Update nav active states
+  document.getElementById('nav-calendar').classList.remove('active');
+  document.getElementById('nav-list').classList.remove('active');
+  document.getElementById('nav-inventory').classList.remove('active');
+  document.getElementById('nav-members').classList.remove('active');
+  document.getElementById('nav-completed').classList.add('active');
+  // Build table
+  buildCompletedTable();
+}
+
 // -----------------------------------------------------------------------------
 // Inventory and Members Data
 //
@@ -76,6 +274,21 @@ function initializeApp(tasksData) {
   } catch (e) {
     saved = {};
   }
+  // Restore completed tasks from localStorage
+  try {
+    completedTasks = JSON.parse(localStorage.getItem('completedTasks')) || [];
+  } catch (e) {
+    completedTasks = [];
+  }
+  // Ensure tasks have initial_due_date for recurrence calculations and normalize periodicity
+  tasksData.forEach((task) => {
+    if (!task.initial_due_date) {
+      task.initial_due_date = task.due_date;
+    }
+    if (task.periodicity) {
+      task.periodicity = task.periodicity.toString().toUpperCase();
+    }
+  });
   // Build the task list and store row elements for quick access
   buildTaskList(tasksData);
 
@@ -122,6 +335,13 @@ function initializeApp(tasksData) {
       showMembersView();
     });
   }
+  // Set up navigation for completed tasks view
+  const navCompleted = document.getElementById('nav-completed');
+  if (navCompleted) {
+    navCompleted.addEventListener('click', () => {
+      showCompletedView();
+    });
+  }
   // Set up calendar view controls
   document.getElementById('month-view-btn').addEventListener('click', () => {
     currentView = 'month';
@@ -160,6 +380,14 @@ function initializeApp(tasksData) {
   // Build inventory and members tables once the DOM is ready.
   buildInventoryList();
   buildMembersList();
+
+  // Bind search input for completed tasks to filter the log
+  const completedSearch = document.getElementById('completed-search');
+  if (completedSearch) {
+    completedSearch.addEventListener('input', () => {
+      buildCompletedTable();
+    });
+  }
 }
 
 /**
@@ -175,6 +403,11 @@ function buildTaskList(tasksData) {
   tbody.innerHTML = '';
   rowElements = [];
   tasksData.forEach((task, idx) => {
+    // Skip tasks that no longer have a due date (e.g. one‑time tasks after completion)
+    if (!task.due_date) {
+      rowElements[idx] = null;
+      return;
+    }
     const row = document.createElement('tr');
     // Index column
     const idxTd = document.createElement('td');
@@ -309,6 +542,14 @@ function buildTaskList(tasksData) {
         startEditRow(idx);
       });
       actionTd.appendChild(editIcon);
+      // Complete button to mark the current occurrence as done
+      const completeBtn = document.createElement('button');
+      completeBtn.textContent = 'Complete';
+      completeBtn.style.marginLeft = '0.3rem';
+      completeBtn.addEventListener('click', () => {
+        completeTask(idx);
+      });
+      actionTd.appendChild(completeBtn);
     }
     row.appendChild(actionTd);
     tbody.appendChild(row);
@@ -438,11 +679,16 @@ function showCalendarView() {
   document.getElementById('list-view').classList.remove('active');
   document.getElementById('inventory-view').classList.remove('active');
   document.getElementById('members-view').classList.remove('active');
+  // Hide completed view if present
+  const compView = document.getElementById('completed-view');
+  if (compView) compView.classList.remove('active');
   // Update nav button states
   document.getElementById('nav-calendar').classList.add('active');
   document.getElementById('nav-list').classList.remove('active');
   document.getElementById('nav-inventory').classList.remove('active');
   document.getElementById('nav-members').classList.remove('active');
+  const navComp = document.getElementById('nav-completed');
+  if (navComp) navComp.classList.remove('active');
   // Ensure calendar is updated when switching back
   renderCalendar(tasksData);
 }
@@ -457,11 +703,16 @@ function showListView() {
   document.getElementById('list-view').classList.add('active');
   document.getElementById('inventory-view').classList.remove('active');
   document.getElementById('members-view').classList.remove('active');
+  // Hide completed view if present
+  const compView = document.getElementById('completed-view');
+  if (compView) compView.classList.remove('active');
   // Update navigation
   document.getElementById('nav-calendar').classList.remove('active');
   document.getElementById('nav-list').classList.add('active');
   document.getElementById('nav-inventory').classList.remove('active');
   document.getElementById('nav-members').classList.remove('active');
+  const navComp = document.getElementById('nav-completed');
+  if (navComp) navComp.classList.remove('active');
 }
 
 /**
@@ -602,6 +853,9 @@ function showInventoryView() {
   document.getElementById('calendar-view').classList.remove('active');
   document.getElementById('list-view').classList.remove('active');
   document.getElementById('members-view').classList.remove('active');
+  // Hide completed view if present
+  const compView = document.getElementById('completed-view');
+  if (compView) compView.classList.remove('active');
   // Show inventory
   document.getElementById('inventory-view').classList.add('active');
   // Update nav active states
@@ -609,6 +863,8 @@ function showInventoryView() {
   document.getElementById('nav-list').classList.remove('active');
   document.getElementById('nav-inventory').classList.add('active');
   document.getElementById('nav-members').classList.remove('active');
+  const navComp = document.getElementById('nav-completed');
+  if (navComp) navComp.classList.remove('active');
 }
 
 /**
@@ -619,11 +875,16 @@ function showMembersView() {
   document.getElementById('calendar-view').classList.remove('active');
   document.getElementById('list-view').classList.remove('active');
   document.getElementById('inventory-view').classList.remove('active');
+  // Hide completed view if present
+  const compView = document.getElementById('completed-view');
+  if (compView) compView.classList.remove('active');
   document.getElementById('members-view').classList.add('active');
   document.getElementById('nav-calendar').classList.remove('active');
   document.getElementById('nav-list').classList.remove('active');
   document.getElementById('nav-inventory').classList.remove('active');
   document.getElementById('nav-members').classList.add('active');
+  const navComp = document.getElementById('nav-completed');
+  if (navComp) navComp.classList.remove('active');
 }
 
 /**
@@ -653,18 +914,19 @@ function renderCalendar(tasksData) {
     // Month heading
     header.textContent = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
     calDiv.appendChild(header);
-    // Build tasksByDate map for this month
+    // Build tasksByDate map for the entire month, including recurring occurrences
     const tasksByDate = {};
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
     tasksData.forEach((task, idx) => {
-      // Apply current filter before adding to calendar
+      // Apply periodicity filter
       if (currentFilter !== 'All' && task.periodicity !== currentFilter) return;
-      if (!task.due_date) return;
-      const d = new Date(task.due_date + 'T00:00:00');
-      if (d.getFullYear() === currentDate.getFullYear() && d.getMonth() === currentDate.getMonth()) {
-        const key = formatDate(d);
+      const occs = generateOccurrences(task, startOfMonth, endOfMonth);
+      occs.forEach(occ => {
+        const key = formatDate(occ);
         if (!tasksByDate[key]) tasksByDate[key] = [];
-        tasksByDate[key].push({ task, index: idx });
-      }
+        tasksByDate[key].push({ task, index: idx, date: occ });
+      });
     });
     // Determine layout parameters
     const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
@@ -692,10 +954,21 @@ function renderCalendar(tasksData) {
           dayDiv.textContent = dateCounter;
           td.appendChild(dayDiv);
           const tasksForDay = tasksByDate[dateStr] || [];
-          tasksForDay.forEach(({ task, index }) => {
+          const todayStrMonth = formatDate(new Date());
+          tasksForDay.forEach(({ task, index, date: occDate }) => {
             const item = document.createElement('div');
             item.className = 'task-item';
-            const status = saved[index] && saved[index].completed_by ? 'completed' : 'pending';
+            const occStr = formatDate(occDate);
+            let status;
+            if (isTaskCompleted(index, occStr)) {
+              status = 'completed';
+            } else if (occStr < todayStrMonth) {
+              status = 'overdue';
+            } else if (occStr === todayStrMonth) {
+              status = 'due-today';
+            } else {
+              status = 'pending';
+            }
             item.classList.add(status);
             let text = `${task.policy}: ${task.task}`;
             if (text.length > 60) text = text.slice(0, 57) + '...';
@@ -726,18 +999,16 @@ function renderCalendar(tasksData) {
     const endStr = `${monthNames[endOfWeek.getMonth()]} ${endOfWeek.getDate()}, ${endOfWeek.getFullYear()}`;
     header.textContent = `Week of ${startStr} - ${endStr}`;
     calDiv.appendChild(header);
-    // Build tasksByDate for this week
+    // Build tasksByDate for this week, including recurring occurrences
     const tasksByDate = {};
     tasksData.forEach((task, idx) => {
-      // Apply filter
       if (currentFilter !== 'All' && task.periodicity !== currentFilter) return;
-      if (!task.due_date) return;
-      const d = new Date(task.due_date + 'T00:00:00');
-      if (d >= startOfWeek && d <= endOfWeek) {
-        const key = formatDate(d);
+      const occs = generateOccurrences(task, startOfWeek, endOfWeek);
+      occs.forEach(occ => {
+        const key = formatDate(occ);
         if (!tasksByDate[key]) tasksByDate[key] = [];
-        tasksByDate[key].push({ task, index: idx });
-      }
+        tasksByDate[key].push({ task, index: idx, date: occ });
+      });
     });
     // Build week table: header row with day names and date numbers
     const table = document.createElement('table');
@@ -758,10 +1029,21 @@ function renderCalendar(tasksData) {
       dateObj.setDate(startOfWeek.getDate() + i);
       const key = formatDate(dateObj);
       const tasksForDay = tasksByDate[key] || [];
-      tasksForDay.forEach(({ task, index }) => {
+      const todayStrWeek = formatDate(new Date());
+      tasksForDay.forEach(({ task, index, date: occDate }) => {
         const item = document.createElement('div');
         item.className = 'task-item';
-        const status = saved[index] && saved[index].completed_by ? 'completed' : 'pending';
+        const occStr = formatDate(occDate);
+        let status;
+        if (isTaskCompleted(index, occStr)) {
+          status = 'completed';
+        } else if (occStr < todayStrWeek) {
+          status = 'overdue';
+        } else if (occStr === todayStrWeek) {
+          status = 'due-today';
+        } else {
+          status = 'pending';
+        }
         item.classList.add(status);
         let text = `${task.policy}: ${task.task}`;
         if (text.length > 60) text = text.slice(0, 57) + '...';
@@ -779,23 +1061,22 @@ function renderCalendar(tasksData) {
     table.appendChild(trWeek);
     calDiv.appendChild(table);
   } else {
-    // Day view
+    // Day view: display all occurrences of tasks scheduled for this date
     header.textContent = `${monthNames[currentDate.getMonth()]} ${currentDate.getDate()}, ${currentDate.getFullYear()}`;
     calDiv.appendChild(header);
-    // Find tasks for this day
+    // Determine start and end of the current day
+    const startOfDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setHours(23, 59, 59, 999);
     const tasksForDay = [];
     tasksData.forEach((task, idx) => {
-      // Apply filter
+      // Apply periodicity filter
       if (currentFilter !== 'All' && task.periodicity !== currentFilter) return;
-      if (!task.due_date) return;
-      const d = new Date(task.due_date + 'T00:00:00');
-      if (
-        d.getFullYear() === currentDate.getFullYear() &&
-        d.getMonth() === currentDate.getMonth() &&
-        d.getDate() === currentDate.getDate()
-      ) {
-        tasksForDay.push({ task, index: idx });
-      }
+      // Generate occurrences within this day
+      const occs = generateOccurrences(task, startOfDay, endOfDay);
+      occs.forEach(occ => {
+        tasksForDay.push({ task, index: idx, date: occ });
+      });
     });
     if (tasksForDay.length === 0) {
       const p = document.createElement('p');
@@ -803,11 +1084,24 @@ function renderCalendar(tasksData) {
       calDiv.appendChild(p);
     } else {
       const ul = document.createElement('ul');
-      tasksForDay.forEach(({ task, index }) => {
+      // Sort occurrences chronologically (though they all start at midnight)
+      tasksForDay.sort((a, b) => a.date - b.date);
+      const todayStr = formatDate(new Date());
+      tasksForDay.forEach(({ task, index, date: occDate }) => {
         const li = document.createElement('li');
         const item = document.createElement('div');
         item.className = 'task-item';
-        const status = saved[index] && saved[index].completed_by ? 'completed' : 'pending';
+        const occStr = formatDate(occDate);
+        let status;
+        if (isTaskCompleted(index, occStr)) {
+          status = 'completed';
+        } else if (occStr < todayStr) {
+          status = 'overdue';
+        } else if (occStr === todayStr) {
+          status = 'due-today';
+        } else {
+          status = 'pending';
+        }
         item.classList.add(status);
         item.textContent = `${task.policy}: ${task.task}`;
         item.title = `${task.policy}: ${task.task}`;

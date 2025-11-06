@@ -122,8 +122,21 @@
       border-left: 4px solid #388e3c;
     }
     .task-item.pending {
+      /* Pending tasks (future) show a neutral/light blue color */
+      background-color: #e3f2fd;
+      border-left: 4px solid #64b5f6;
+    }
+
+    /* Overdue tasks (past due and not completed) show red */
+    .task-item.overdue {
       background-color: #ffcdd2;
       border-left: 4px solid #d32f2f;
+    }
+
+    /* Tasks due today are highlighted in yellow */
+    .task-item.due-today {
+      background-color: #fff9c4;
+      border-left: 4px solid #fbc02d;
     }
 
     /* Styles for list and calendar sections */
@@ -277,6 +290,17 @@
           <!-- Table content will be generated via tasks.js -->
         </table>
       </div>
+
+      <!-- Completed tasks history view section -->
+      <div id="completed-view" class="view-section">
+        <h2>Completed Tasks History</h2>
+        <p>This table lists all completed task occurrences. Use the search box to filter.</p>
+        <!-- Search box for completed tasks -->
+        <input type="text" id="completed-search" placeholder="Search completed tasks..." style="margin-bottom:0.5rem;padding:0.3rem;width:100%;max-width:300px;">
+        <table id="completed-table">
+          <!-- Table content will be generated in tasks.js -->
+        </table>
+      </div>
     </div>
     <!-- Sidebar for navigation -->
     <div id="sidebar">
@@ -285,6 +309,7 @@
       <!-- Additional buttons for new views -->
       <button id="nav-inventory">Inventory</button>
       <button id="nav-members">Members</button>
+      <button id="nav-completed">History</button>
     </div>
   </div>
   <!-- Our custom tasks and logic -->
