@@ -2435,6 +2435,17 @@ try {
       task.periodicity = task.periodicity.toString().toUpperCase();
     }
   });
+  // Strip citation-like bracket strings from descriptions (e.g., "【...】").
+  tasksData.forEach((task) => {
+    if (task.description) {
+      // Remove any substrings enclosed in brackets starting with "【" and ending with "】"
+      task.description = task.description.replace(/【[^】]+】/g, '').trim();
+    }
+    // Also cleanse the task title itself in case it contains bracketed citations.
+    if (task.task) {
+      task.task = task.task.replace(/【[^】]+】/g, '').trim();
+    }
+  });
 } catch (e) {
   // On error, just use default tasks
   tasksData = defaultMonitoringTasks;
