@@ -260,11 +260,31 @@
           <tbody></tbody>
         </table>
       </div>
+      <!-- New inventory view section -->
+      <div id="inventory-view" class="view-section">
+        <h2>Inventory List</h2>
+        <p>This table shows all inventory items from the office inventory sheet.</p>
+        <table id="inventory-table" class="inventory-table">
+          <!-- Table content will be generated via tasks.js -->
+        </table>
+      </div>
+
+      <!-- New members view section -->
+      <div id="members-view" class="view-section">
+        <h2>Team Members</h2>
+        <p>This table lists team members and their assigned assets from the inventory.</p>
+        <table id="members-table" class="members-table">
+          <!-- Table content will be generated via tasks.js -->
+        </table>
+      </div>
     </div>
     <!-- Sidebar for navigation -->
     <div id="sidebar">
       <button id="nav-calendar" class="active">Calendar</button>
       <button id="nav-list">Task List</button>
+      <!-- Additional buttons for new views -->
+      <button id="nav-inventory">Inventory</button>
+      <button id="nav-members">Members</button>
     </div>
   </div>
   <!-- Our custom tasks and logic -->

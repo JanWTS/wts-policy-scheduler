@@ -15,6 +15,53 @@ let currentFilter = 'All';
 // Index of the row currently being edited (null if none)
 let editingRowIndex = null;
 
+// -----------------------------------------------------------------------------
+// Inventory and Members Data
+//
+// We embed the office inventory list and the members list directly in this
+// script so that the application can run entirely offline without needing
+// to fetch JSON files via the file:// protocol (which is blocked by
+// browsers).  The arrays below are auto‑generated from the uploaded
+// spreadsheet.  Each inventory item contains fields such as inventoryId,
+// serialNumber, itemName, itemDescription, quantity, itemPrice, location,
+// issuedTo, issuedDate and notes.  The members array contains objects
+// with a `name` property and an `assets` array listing the assets (by
+// inventoryId and itemName) assigned to that person.
+const inventoryData = [{"inventoryId": "Office", "serialNumber": "LINIQ8WZ4314480", "itemName": "Vizio V-Series 50\"", "itemDescription": " 4K UHD HDR LED Smart TV", "quantity": 1.0, "itemPrice": 269.99, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Office2", "serialNumber": "LINIQ8WZ4313635", "itemName": "Vizio V-Series 50\"", "itemDescription": "4K UHD HDR LED Smart TV", "quantity": 1.0, "itemPrice": 269.99, "location": "Office Room 3", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Office Printer", "serialNumber": "CVBRR2N4DM", "itemName": "HP ColorJet Pro MFP4301", "itemDescription": "Color Printer", "quantity": 1.0, "itemPrice": 699.99, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 1", "serialNumber": "3CM3240BXC", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "WorkSpace04", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 2", "serialNumber": "3CM328198F", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "WorkSpace04", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 3", "serialNumber": "3CM3460JSG", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 4", "serialNumber": "3CM3460JS6", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 5", "serialNumber": "3CM3460JSH", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "WorkSpace04", "issuedTo": "Ken Stein", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 6", "serialNumber": "3CM3460JTD", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 1", "issuedTo": "Ken Stein", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 7", "serialNumber": "3CM3460JS4", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Jan Miketa", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 8", "serialNumber": "3CM3460JSD", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Jan Miketa", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 9", "serialNumber": "3CM3460JS7", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Becky Sowell", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 10", "serialNumber": "3CM3460JSJ", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Becky Sowell", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 11", "serialNumber": "3CM4200JJY", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Carole Zehner", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 12", "serialNumber": "3CM4150HYY", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Carole Zehner", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 13", "serialNumber": "3CM4236RRG", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 2", "issuedTo": "Jackie Chrabot", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 14", "serialNumber": "3CM4230RRW", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 2", "issuedTo": "Jackie Chrabot", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 15", "serialNumber": "3CM42913TX", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 16", "serialNumber": "3CM42914HZ", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS LT-0001", "serialNumber": "HS6H1Z3", "itemName": "DELL VOSTRO 15 LAPTOP", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 849.0, "location": "Jacob Gonzales", "issuedTo": "Jacob Gonzales", "issuedDate": "Nov. 2025", "notes": ""}, {"inventoryId": "WTS LT-0002", "serialNumber": "6TM61Z3", "itemName": "DELL VOSTRO 15 LAPTOP 3530", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 849.0, "location": "Office Room 3", "issuedTo": "Carole Zehner", "issuedDate": "Sep. 2025", "notes": ""}, {"inventoryId": "WTS LT-0003", "serialNumber": "3ZKH1Z3", "itemName": "DELL VOSTRO 15 LAPTOP 3530", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 849.0, "location": "Office Room 3", "issuedTo": "Becky Sowell", "issuedDate": "Sep. 2024", "notes": ""}, {"inventoryId": "WTS LT-0004", "serialNumber": "G9RH1Z3", "itemName": "DELL VOSTRO 15 LAPTOP 3530", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 849.0, "location": "Office Room 1", "issuedTo": "Ken Stein", "issuedDate": "Jan. 2024", "notes": ""}, {"inventoryId": "WTS LT-0005", "serialNumber": "5CG93373QP", "itemName": "HP ELITEBOOK 840 G5", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 674.99, "location": "Assigned to Jacqueline", "issuedTo": "Jackie Chrabot", "issuedDate": "Mar. 2025", "notes": ""}, {"inventoryId": "WTS LT-0006", "serialNumber": "TA850612", "itemName": "HP ELITEBOOK 840 G5", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 674.99, "location": "(RETIRED/BROKEN)", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS LT-0007", "serialNumber": "5CG9112HB5", "itemName": "HP ELITEBOOK 840 G6", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 674.99, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS LT-0008", "serialNumber": "A131ZJUA#ABA", "itemName": "HP OMNIBOOK 14", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 1499.99, "location": "Assigned to Tom", "issuedTo": "Tom Crain", "issuedDate": "Jun. 2024", "notes": ""}, {"inventoryId": "WTS LT-0009", "serialNumber": "ST: F7RH1Z3", "itemName": "DELL VOSTRO 15 LAPTOP 3530", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 849.0, "location": "Office Room 3", "issuedTo": "Jan Miketa", "issuedDate": "", "notes": ""}, {"inventoryId": "OfficeDesk1 ", "serialNumber": "8QSTAD", "itemName": "HON Executive Desk  H10712L.JJ", "itemDescription": "Office desk (L-shape) Bowfront", "quantity": 1.0, "itemPrice": 499.99, "location": "WorkSpace04", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "OfficeDesk2", "serialNumber": "C7U52A( LEFTSIDE) CUU5EA (RIGHTSIDE)", "itemName": "HON Executive Desk 101064 JJ", "itemDescription": "Office desk (L-shape)", "quantity": 1.0, "itemPrice": 499.99, "location": "Unassigned", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "OfficeDesk3", "serialNumber": "86STAD", "itemName": "HON Executive Desk H10712L.JJ", "itemDescription": "Office desk (L-shape)", "quantity": 1.0, "itemPrice": 499.99, "location": "Unassigned", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "OfficeDesk4", "serialNumber": "CKU52A (LEFTSIDE) CRU5EA (RIGHTSIDE)", "itemName": "HON Executive Desk 101064 JJ", "itemDescription": "Office desk (L-shape)", "quantity": 1.0, "itemPrice": 499.99, "location": "Office Room 2", "issuedTo": "Jackie Chrabot", "issuedDate": "", "notes": ""}, {"inventoryId": "Micro01", "serialNumber": "T230730040990", "itemName": "Cuisinart Microwave Oven", "itemDescription": "Office Microwave", "quantity": 1.0, "itemPrice": 109.99, "location": "Breakroom Kitchen", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS1 Phone", "serialNumber": "FVH27040", "itemName": "Cisco IP Phone 8851", "itemDescription": "Desk Phone", "quantity": 1.0, "itemPrice": 350.0, "location": "Office Room 4", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS2 Phone", "serialNumber": "FVH27040J2P", "itemName": "Cisco IP Phone 8851", "itemDescription": "Desk Phone", "quantity": 1.0, "itemPrice": 350.0, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS3 Phone", "serialNumber": "FVH27040FPQ", "itemName": "Cisco IP Phone 8851", "itemDescription": "Desk Phone", "quantity": 1.0, "itemPrice": 350.0, "location": "Office Room 1", "issuedTo": "Ken Stein", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS4 Phone", "serialNumber": "FVH27040K0H", "itemName": "Cisco IP Phone 8851", "itemDescription": "Desk Phone", "quantity": 1.0, "itemPrice": 350.0, "location": "Unassigned", "issuedTo": "Retrieving data. Wait a few seconds and try to cut or copy again.", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS5 Phone", "serialNumber": "FVH27040N3H", "itemName": "Cisco IP Phone 8851", "itemDescription": "Desk Phone", "quantity": 1.0, "itemPrice": 350.0, "location": "Office Room 3", "issuedTo": "Retrieving data. Wait a few seconds and try to cut or copy again.", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC01", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC02", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC03", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC04", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC05", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC06", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC07", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC08", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC01", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC02", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC03", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC04", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC05", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC06", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC07", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC08", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BAC01", "serialNumber": "", "itemName": "Sit On It Guest Arm Chair Blue", "itemDescription": "Arm Chair", "quantity": 1.0, "itemPrice": 79.99, "location": "WorkSpace04", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "BAC02", "serialNumber": "", "itemName": "Sit On It Guest Arm Chair Blue", "itemDescription": "Arm Chair", "quantity": 1.0, "itemPrice": 79.99, "location": "WorkSpace04", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "RT01", "serialNumber": "", "itemName": "Office sourse 36\" Round discussion Table", "itemDescription": "lounge table (round)", "quantity": 1.0, "itemPrice": 149.99, "location": "Employee Breakroom", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 1", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace03", "issuedTo": "  ", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 2", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace03", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 3", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace03", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 4", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace03", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 5", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 6", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 7", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 8", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace01", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 9", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace01", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "REFER01", "serialNumber": "", "itemName": "Whirlpool", "itemDescription": "Refridgerator", "quantity": 1.0, "itemPrice": 159.99, "location": "Employee Breakroom", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "SHREDDER01", "serialNumber": 24040100058, "itemName": "Kitnery", "itemDescription": "CUI Shredder", "quantity": 1.0, "itemPrice": 369.0, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": "kitnery.us@outlook.com"}, {"inventoryId": "Trash Can 1", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 2", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Kitchen Breakroom", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 3 ", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 4 ", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 5", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 6", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 7", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Teleconference Puck", "serialNumber": "EERXK9", "itemName": "Poly Sync", "itemDescription": "Teleconference Puck", "quantity": 1.0, "itemPrice": 139.99, "location": "Assigned to Tom", "issuedTo": "Tom Crain", "issuedDate": "", "notes": ""}, {"inventoryId": "SW001", "serialNumber": "", "itemName": "MSI", "itemDescription": "Dev Laptop ", "quantity": "", "itemPrice": "", "location": "Office Room 3", "issuedTo": "Jan Miketa", "issuedDate": "", "notes": ""}];
+const membersData = [{"name": "Steve Dutter", "assets": [{"inventoryId": "WTS Monitor 1", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 2", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "OfficeDesk1 ", "itemName": "HON Executive Desk  H10712L.JJ"}, {"inventoryId": "WTS1 Phone", "itemName": "Cisco IP Phone 8851"}, {"inventoryId": "BLKFC01", "itemName": "Haworth Zody Multifunction Task Chair Black"}, {"inventoryId": "BAC01", "itemName": "Sit On It Guest Arm Chair Blue"}, {"inventoryId": "BAC02", "itemName": "Sit On It Guest Arm Chair Blue"}]}, {"name": "Ken Stein", "assets": [{"inventoryId": "WTS Monitor 5", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 6", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0004", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}, {"inventoryId": "WTS3 Phone", "itemName": "Cisco IP Phone 8851"}, {"inventoryId": "BLKFC02", "itemName": "Haworth Zody Multifunction Task Chair Black"}]}, {"name": "Jan Miketa", "assets": [{"inventoryId": "WTS Monitor 7", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 8", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0009", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}, {"inventoryId": "SW001", "itemName": "MSI"}]}, {"name": "Becky Sowell", "assets": [{"inventoryId": "WTS Monitor 9", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 10", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0003", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}]}, {"name": "Carole Zehner", "assets": [{"inventoryId": "WTS Monitor 11", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 12", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0002", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}]}, {"name": "Jackie Chrabot", "assets": [{"inventoryId": "WTS Monitor 13", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 14", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0005", "itemName": "HP ELITEBOOK 840 G5"}, {"inventoryId": "OfficeDesk4", "itemName": "HON Executive Desk 101064 JJ"}]}, {"name": "Jacob Gonzales", "assets": [{"inventoryId": "WTS LT-0001", "itemName": "DELL VOSTRO 15 LAPTOP"}]}, {"name": "Tom Crain", "assets": [{"inventoryId": "WTS LT-0008", "itemName": "HP OMNIBOOK 14"}, {"inventoryId": "Teleconference Puck", "itemName": "Poly Sync"}]}, {"name": "Retrieving data. Wait a few seconds and try to cut or copy again.", "assets": [{"inventoryId": "WTS4 Phone", "itemName": "Cisco IP Phone 8851"}, {"inventoryId": "WTS5 Phone", "itemName": "Cisco IP Phone 8851"}]}];
+
+/**
+ * Load inventory and members data from JSON files.  The data files are
+ * located in the "data" folder next to this script (inventory.json and
+ * members.json).  When running from a local file (file:/// protocol), fetch
+ * may fail; in that case the data arrays remain empty and the corresponding
+ * views will simply show no rows.
+ *
+ * @returns {Promise<void>} A promise that resolves once both data sets are
+ *   loaded (or attempted).  The loaded data is stored in inventoryData and
+ *   membersData.
+ */
+async function loadInventoryData() {
+  try {
+    const invResp = await fetch('data/inventory.json');
+    if (invResp.ok) {
+      inventoryData = await invResp.json();
+    }
+  } catch (e) {
+    console.error('Failed to load inventory.json', e);
+    inventoryData = [];
+  }
+  try {
+    const memResp = await fetch('data/members.json');
+    if (memResp.ok) {
+      membersData = await memResp.json();
+    }
+  } catch (e) {
+    console.error('Failed to load members.json', e);
+    membersData = [];
+  }
+}
+
 /**
  * Initialize the application.  Builds the task list, sets up event handlers
  * for navigation and view switching, restores saved completion/verification
@@ -62,6 +109,19 @@ function initializeApp(tasksData) {
   navList.addEventListener('click', () => {
     showListView();
   });
+  // Set up navigation for inventory and members views
+  const navInventory = document.getElementById('nav-inventory');
+  const navMembers = document.getElementById('nav-members');
+  if (navInventory) {
+    navInventory.addEventListener('click', () => {
+      showInventoryView();
+    });
+  }
+  if (navMembers) {
+    navMembers.addEventListener('click', () => {
+      showMembersView();
+    });
+  }
   // Set up calendar view controls
   document.getElementById('month-view-btn').addEventListener('click', () => {
     currentView = 'month';
@@ -96,6 +156,10 @@ function initializeApp(tasksData) {
   updateViewButtons();
   showCalendarView();
   renderCalendar(tasksData);
+
+  // Build inventory and members tables once the DOM is ready.
+  buildInventoryList();
+  buildMembersList();
 }
 
 /**
@@ -369,10 +433,16 @@ function updateViewButtons() {
  * navigation button active states.
  */
 function showCalendarView() {
+  // Show calendar, hide all other view sections
   document.getElementById('calendar-view').classList.add('active');
   document.getElementById('list-view').classList.remove('active');
+  document.getElementById('inventory-view').classList.remove('active');
+  document.getElementById('members-view').classList.remove('active');
+  // Update nav button states
   document.getElementById('nav-calendar').classList.add('active');
   document.getElementById('nav-list').classList.remove('active');
+  document.getElementById('nav-inventory').classList.remove('active');
+  document.getElementById('nav-members').classList.remove('active');
   // Ensure calendar is updated when switching back
   renderCalendar(tasksData);
 }
@@ -382,10 +452,16 @@ function showCalendarView() {
  * navigation button active states.
  */
 function showListView() {
+  // Show list, hide other views
   document.getElementById('calendar-view').classList.remove('active');
   document.getElementById('list-view').classList.add('active');
+  document.getElementById('inventory-view').classList.remove('active');
+  document.getElementById('members-view').classList.remove('active');
+  // Update navigation
   document.getElementById('nav-calendar').classList.remove('active');
   document.getElementById('nav-list').classList.add('active');
+  document.getElementById('nav-inventory').classList.remove('active');
+  document.getElementById('nav-members').classList.remove('active');
 }
 
 /**
@@ -441,6 +517,113 @@ function finishEditRow(index) {
   buildTaskList(tasksData);
   // Re-render calendar to reflect changes
   renderCalendar(tasksData);
+}
+
+/**
+ * Build the inventory table using the embedded inventoryData array.  This
+ * function generates a header row and one row per inventory item with all
+ * columns displayed.  It is called once during initialization and again
+ * whenever the page is refreshed via GitHub Pages.
+ */
+function buildInventoryList() {
+  const table = document.getElementById('inventory-table');
+  if (!table) return;
+  // Clear existing content
+  table.innerHTML = '';
+  // Build header
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  const headers = ['Inventory ID','Serial #','Item Name','Description','Quantity','Price','Location','Issued To','Issued Date','Notes'];
+  headers.forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+  // Build body
+  const tbody = document.createElement('tbody');
+  inventoryData.forEach(item => {
+    const tr = document.createElement('tr');
+    [item.inventoryId, item.serialNumber, item.itemName, item.itemDescription,
+     item.quantity, item.itemPrice, item.location, item.issuedTo,
+     item.issuedDate, item.notes].forEach(val => {
+      const td = document.createElement('td');
+      td.textContent = (val !== undefined && val !== null) ? val : '';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+}
+
+/**
+ * Build the members table using the embedded membersData array.  Each row
+ * shows the member name and a comma‑separated list of their assigned
+ * assets (inventoryId and itemName).
+ */
+function buildMembersList() {
+  const table = document.getElementById('members-table');
+  if (!table) return;
+  table.innerHTML = '';
+  // Header
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  ['Team Member','Assets'].forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+  // Body
+  const tbody = document.createElement('tbody');
+  membersData.forEach(member => {
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.textContent = member.name;
+    tr.appendChild(nameTd);
+    const assetsTd = document.createElement('td');
+    // Map each asset to "InventoryID (ItemName)" or just ItemName
+    const assetsText = member.assets.map(a => `${a.inventoryId} (${a.itemName})`).join(', ');
+    assetsTd.textContent = assetsText;
+    tr.appendChild(assetsTd);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+}
+
+/**
+ * Show the inventory view and hide other views.  Updates navigation button
+ * states accordingly.
+ */
+function showInventoryView() {
+  // Hide other views
+  document.getElementById('calendar-view').classList.remove('active');
+  document.getElementById('list-view').classList.remove('active');
+  document.getElementById('members-view').classList.remove('active');
+  // Show inventory
+  document.getElementById('inventory-view').classList.add('active');
+  // Update nav active states
+  document.getElementById('nav-calendar').classList.remove('active');
+  document.getElementById('nav-list').classList.remove('active');
+  document.getElementById('nav-inventory').classList.add('active');
+  document.getElementById('nav-members').classList.remove('active');
+}
+
+/**
+ * Show the members view and hide other views.  Updates navigation button
+ * states accordingly.
+ */
+function showMembersView() {
+  document.getElementById('calendar-view').classList.remove('active');
+  document.getElementById('list-view').classList.remove('active');
+  document.getElementById('inventory-view').classList.remove('active');
+  document.getElementById('members-view').classList.add('active');
+  document.getElementById('nav-calendar').classList.remove('active');
+  document.getElementById('nav-list').classList.remove('active');
+  document.getElementById('nav-inventory').classList.remove('active');
+  document.getElementById('nav-members').classList.add('active');
 }
 
 /**
