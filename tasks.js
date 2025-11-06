@@ -150,7 +150,7 @@ function buildTaskList(tasksData) {
     const perTd = document.createElement('td');
     if (isEditing) {
       const sel = document.createElement('select');
-      const options = ['DAILY','WEEKLY','MONTHLY','QUARTERLY','SEMIANNUALLY','ANNUALLY'];
+      const options = ['DAILY','WEEKLY','MONTHLY','QUARTERLY','SEMIANNUALLY','ANNUALLY','OTHER'];
       options.forEach(opt => {
         const option = document.createElement('option');
         option.value = opt;
@@ -1077,19 +1077,545 @@ tasksData.forEach((task) => {
     task.periodicity = task.periodicity.toString().toUpperCase();
   }
 });
+
+// Define the default monitoring tasks derived from the monitoring_tasks.xlsx file.
+// We populate this list with 63 tasks, each with a policy name, task description,
+// uppercase periodicity, calculated due date and empty completion/verification fields.
+const defaultMonitoringTasks = [
+  {
+    "policy": "Monitoring",
+    "task": "Correlated audit log reviews",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Vulnerability and threat scans",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Threat-hunting queries",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Log and anomaly reviews",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Mobile device exceptions",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Payment system logs",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Risk and POAM checks",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "User-account reconciliation",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Messaging patterns",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Card-data purge report",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Audit-log export",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Laptop dashboards review",
+    "periodicity": "WEEKLY",
+    "due_date": "2025-11-12",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Visitor-log review",
+    "periodicity": "MONTHLY",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Payment-access reconciliation",
+    "periodicity": "MONTHLY",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Mobile-asset reconciliation",
+    "periodicity": "MONTHLY",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Patch report",
+    "periodicity": "MONTHLY",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Social-media monitoring",
+    "periodicity": "MONTHLY",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Unauthorized-software scans",
+    "periodicity": "MONTHLY",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Card-statement reconciliation",
+    "periodicity": "MONTHLY",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "License inventory check",
+    "periodicity": "MONTHLY",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "General log reviews",
+    "periodicity": "MONTHLY",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Security trend report",
+    "periodicity": "MONTHLY",
+    "due_date": "2025-12-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Privileged-account review",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Asset-inventory audit",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Resource-access audit",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Audit-log review",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Training metrics",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Configuration audits",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Device-inventory reconciliation",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Group-membership review",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "180-day log review",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "License reconciliation",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Payment-system tests",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Vulnerability scans (CUI)",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Backup-integrity check",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Key-register audit",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Threat Snapshot briefing",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Retention access review",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Manager access attestation",
+    "periodicity": "QUARTERLY",
+    "due_date": "2026-02-03",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "CUI access certification",
+    "periodicity": "SEMIANNUALLY",
+    "due_date": "2026-05-04",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Privileged-role review",
+    "periodicity": "SEMIANNUALLY",
+    "due_date": "2026-05-04",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Baseline image update",
+    "periodicity": "SEMIANNUALLY",
+    "due_date": "2026-05-04",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Laptop-fleet compliance",
+    "periodicity": "SEMIANNUALLY",
+    "due_date": "2026-05-04",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Messaging-policy audit",
+    "periodicity": "SEMIANNUALLY",
+    "due_date": "2026-05-04",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "VPN & patch audit",
+    "periodicity": "SEMIANNUALLY",
+    "due_date": "2026-05-04",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Mobile compliance audit",
+    "periodicity": "SEMIANNUALLY",
+    "due_date": "2026-05-04",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Physical-records audit",
+    "periodicity": "SEMIANNUALLY",
+    "due_date": "2026-05-04",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Security training",
+    "periodicity": "ANNUALLY",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Laptop inventory audit",
+    "periodicity": "ANNUALLY",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "License compliance attestation",
+    "periodicity": "ANNUALLY",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Encryption key rotation",
+    "periodicity": "ANNUALLY",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Supplier risk assessment",
+    "periodicity": "ANNUALLY",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Retention governance",
+    "periodicity": "ANNUALLY",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Policy and system audits",
+    "periodicity": "ANNUALLY",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Threat intel & encryption review",
+    "periodicity": "ANNUALLY",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Cyber awareness training",
+    "periodicity": "ANNUALLY",
+    "due_date": "2026-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Password rotation",
+    "periodicity": "OTHER",
+    "due_date": "2025-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "30-day new-hire audit",
+    "periodicity": "OTHER",
+    "due_date": "2025-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Critical patching",
+    "periodicity": "OTHER",
+    "due_date": "2025-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Telemetry & logs",
+    "periodicity": "OTHER",
+    "due_date": "2025-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Backup schedule",
+    "periodicity": "OTHER",
+    "due_date": "2025-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Card-data purge",
+    "periodicity": "OTHER",
+    "due_date": "2025-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  },
+  {
+    "policy": "Monitoring",
+    "task": "Break-glass review",
+    "periodicity": "OTHER",
+    "due_date": "2025-11-05",
+    "completed_by": "",
+    "verified_by": ""
+  }
+];
+
+// Override the default policy tasks with the Monitoring tasks derived above.
+// We assign tasksData to our defaultMonitoringTasks here so that the scheduler
+// uses the new list instead of the encoded WTS tasks.  The subsequent
+// localStorage override will replace tasksData with user-edited tasks if any.
+tasksData = defaultMonitoringTasks;
 // Override tasksData with any custom tasks stored in localStorage.
 try {
   const stored = localStorage.getItem('customTasks');
   if (stored) {
     const parsed = JSON.parse(stored);
     if (Array.isArray(parsed)) {
-      tasksData = parsed;
-      // Normalize periodicity on loaded custom tasks
-      tasksData.forEach((task) => {
-        if (task.periodicity) {
-          task.periodicity = task.periodicity.toString().toUpperCase();
-        }
-      });
+      // Only use saved custom tasks if they match the Monitoring dataset.  If
+      // the saved tasks come from a previous policy import (e.g., the WTS
+      // default tasks), ignore them and fall back to the defaultMonitoringTasks.
+      const allMonitoring = parsed.length > 0 && parsed.every(t => t.policy === 'Monitoring');
+      if (allMonitoring) {
+        tasksData = parsed;
+        // Normalize periodicity on loaded custom tasks
+        tasksData.forEach((task) => {
+          if (task.periodicity) {
+            task.periodicity = task.periodicity.toString().toUpperCase();
+          }
+        });
+      } else {
+        // Clear out incompatible saved tasks
+        localStorage.removeItem('customTasks');
+        // tasksData remains defaultMonitoringTasks
+      }
     }
   }
 } catch (e) {
