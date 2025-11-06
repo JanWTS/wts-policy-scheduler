@@ -284,22 +284,25 @@
             <option value="QUARTERLY">QUARTERLY</option>
             <option value="SEMIANNUALLY">SEMIANNUALLY</option>
             <option value="ANNUALLY">ANNUALLY</option>
-              <option value="OTHER">OTHER</option>
+            <option value="OTHER">OTHER</option>
           </select>
           <!-- Removed global Edit Tasks button; editing is now per-row -->
           <button id="add-task-btn" type="button">Add Task</button>
+          <!-- Undo button to revert the most recent change -->
+          <button id="undo-btn" type="button">Undo</button>
         </div>
         <table id="task-table">
           <thead>
             <tr>
               <th>#</th>
               <th>Policy</th>
-              <th>Task Description</th>
+              <th>Title</th>
+              <th>Description</th>
               <th>Periodicity</th>
               <th>Due Date</th>
               <th>Completed By</th>
-            <th>Verified By</th>
-            <th>Actions</th>
+              <th>Verified By</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody></tbody>

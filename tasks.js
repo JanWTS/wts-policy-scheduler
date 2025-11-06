@@ -20,6 +20,16 @@ let editingRowIndex = null;
 // date it was completed.  This array is loaded from and saved to localStorage.
 let completedTasks = [];
 
+// History of user actions (add, edit, delete, complete).  Each entry
+// contains a type identifier and enough information to undo the operation.
+// This enables a simple undo feature for the most recent change.
+let actionHistory = [];
+
+// Backup of a task prior to editing.  When a row enters edit mode the
+// original task object is deep-copied here so that it can be restored
+// if the user chooses to undo the edit.  Cleared on finish.
+let editingBackup = null;
+
 /**
  * Compute the next due date for a task based on its periodicity.
  *
@@ -119,6 +129,7 @@ function completeTask(idx) {
   // Capture names from saved status if available
   const compName = saved[idx] ? saved[idx].completed_by || '' : '';
   const verName = saved[idx] ? saved[idx].verified_by || '' : '';
+  // Build a record of this completed occurrence for the history table
   const record = {
     index: idx,
     policy: task.policy,
@@ -129,25 +140,38 @@ function completeTask(idx) {
     completed_date: new Date().toISOString().slice(0, 10)
   };
   completedTasks.push(record);
-  // Persist completed tasks
+  // Persist completed tasks history
   try {
     localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
   } catch (e) {}
-  // Compute next due date based on periodicity
+  // Compute the next due date based on periodicity
   const next = getNextDueDate(dueDate, task.periodicity);
+  // Capture the saved names for undo, then clear them for the new occurrence
+  const prevSaved = saved[idx] ? {
+    completed_by: saved[idx].completed_by || '',
+    verified_by: saved[idx].verified_by || ''
+  } : { completed_by: '', verified_by: '' };
+  // Record the completion action along with previous due date and saved names for undo
+  actionHistory.push({ type: 'complete', index: idx, previousDueDate: dueDate, previousSaved: prevSaved });
+  // Clear the saved names for the next occurrence so the new task is not marked as completed
+  saved[idx] = { completed_by: '', verified_by: '' };
+  try {
+    localStorage.setItem('taskStatus', JSON.stringify(saved));
+  } catch (e) {}
+  // Update the task's due_date to the next occurrence (or clear for non-recurring tasks)
   if (next) {
     tasksData[idx].due_date = next;
   } else {
-    // If no next date (e.g. OTHER), clear the due_date so it no longer shows in the list
     tasksData[idx].due_date = '';
   }
-  // Persist updated tasks to persistent storage
+  // Persist updated tasks to localStorage
   try {
     localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
   } catch (e) {}
-  // Refresh UI
+  // Refresh UI to reflect changes
   buildTaskList(tasksData);
   renderCalendar(tasksData);
+  buildCompletedTable();
 }
 
 /**
@@ -342,6 +366,14 @@ function initializeApp(tasksData) {
       showCompletedView();
     });
   }
+
+  // Set up undo button
+  const undoBtn = document.getElementById('undo-btn');
+  if (undoBtn) {
+    undoBtn.addEventListener('click', () => {
+      undoLastAction();
+    });
+  }
   // Set up calendar view controls
   document.getElementById('month-view-btn').addEventListener('click', () => {
     currentView = 'month';
@@ -409,23 +441,9 @@ function buildTaskList(tasksData) {
       return;
     }
     const row = document.createElement('tr');
-    // Determine row status based on due date and completion
-    const dueStr = task.due_date;
-    if (dueStr) {
-      // Compute status relative to today
-      const todayStrRow = new Date().toISOString().slice(0, 10);
-      let status;
-      if (isTaskCompleted(idx, dueStr)) {
-        status = 'completed';
-      } else if (dueStr < todayStrRow) {
-        status = 'overdue';
-      } else if (dueStr === todayStrRow) {
-        status = 'due-today';
-      } else {
-        status = 'pending';
-      }
-      row.classList.add('row-' + status);
-    }
+    // We no longer assign a status here.  Row color coding is handled
+    // after the cells are created to ensure classes are not added twice
+    // and to allow us to remove previous status classes before adding new
     // Index column
     const idxTd = document.createElement('td');
     idxTd.textContent = idx + 1;
@@ -446,20 +464,35 @@ function buildTaskList(tasksData) {
       policyTd.textContent = task.policy;
     }
     row.appendChild(policyTd);
-    // Task description
-    const taskTd = document.createElement('td');
+    // Title (task name) column
+    const titleTd = document.createElement('td');
     if (isEditing) {
       const inp = document.createElement('input');
       inp.type = 'text';
-      inp.value = task.task;
+      inp.value = task.task || '';
       inp.addEventListener('input', (e) => {
         tasksData[idx].task = e.target.value;
       });
-      taskTd.appendChild(inp);
+      titleTd.appendChild(inp);
     } else {
-      taskTd.textContent = task.task;
+      titleTd.textContent = task.task || '';
     }
-    row.appendChild(taskTd);
+    row.appendChild(titleTd);
+
+    // Description (criteria) column
+    const descTd = document.createElement('td');
+    if (isEditing) {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = task.description || '';
+      inp.addEventListener('input', (e) => {
+        tasksData[idx].description = e.target.value;
+      });
+      descTd.appendChild(inp);
+    } else {
+      descTd.textContent = task.description || '';
+    }
+    row.appendChild(descTd);
     // Periodicity
     const perTd = document.createElement('td');
     if (isEditing) {
@@ -538,6 +571,9 @@ function buildTaskList(tasksData) {
         // Show confirmation before deleting
         const confirmDelete = window.confirm('Are you sure you want to delete this entry?');
         if (confirmDelete) {
+          // Record delete action with a copy of the task and its index
+          const removedTask = JSON.parse(JSON.stringify(tasksData[idx]));
+          actionHistory.push({ type: 'deleteTask', index: idx, task: removedTask });
           // Remove the task from the array
           tasksData.splice(idx, 1);
           editingRowIndex = null;
@@ -574,29 +610,33 @@ function buildTaskList(tasksData) {
     rowElements[idx] = row;
 
     // -----------------------------------------------------------------
-    // Determine row status based on due date and completion status.
-    // We apply the same color scheme used in the calendar to the
-    // corresponding row in the task list.  If a name has been entered
-    // in the "Completed By" field for this task (saved via localStorage),
-    // the row is marked as completed (green).  Otherwise we compare
-    // the task's due_date to today's date to classify it as overdue
-    // (red), due today (yellow) or pending (light blue).
-    let statusClass = '';
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const savedRecord = saved[idx] || {};
-    if (savedRecord.completed_by && savedRecord.completed_by.trim() !== '') {
-      statusClass = 'row-completed';
-    } else if (task.due_date) {
-      if (task.due_date < todayStr) {
-        statusClass = 'row-overdue';
-      } else if (task.due_date === todayStr) {
-        statusClass = 'row-due-today';
+    // Determine row status based on due date and completion status.  We
+    // remove any existing status classes before applying a new one to
+    // avoid stale styling.  If the occurrence corresponding to this
+    // task's current due_date has a completion record or the user has
+    // entered a name in the Completed By field, the row is marked as
+    // completed (green).  Otherwise we compare the due_date to today
+    // to classify it as overdue (red), due today (yellow) or pending
+    // (light blue).
+    row.classList.remove('row-completed','row-overdue','row-due-today','row-pending');
+    if (task.due_date) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const dueDateStr = task.due_date;
+      let status = 'pending';
+      // Check completedTasks records
+      if (isTaskCompleted(idx, dueDateStr)) {
+        status = 'completed';
+      } else if (saved[idx] && saved[idx].completed_by && saved[idx].completed_by.trim() !== '') {
+        // Also mark as completed if user filled Completed By field for this occurrence
+        status = 'completed';
+      } else if (dueDateStr < todayStr) {
+        status = 'overdue';
+      } else if (dueDateStr === todayStr) {
+        status = 'due-today';
       } else {
-        statusClass = 'row-pending';
+        status = 'pending';
       }
-    }
-    if (statusClass) {
-      row.classList.add(statusClass);
+      row.classList.add('row-' + status);
     }
   });
   // Apply filter to show/hide rows based on current selection
@@ -646,12 +686,16 @@ function addTaskRow(tasksData) {
   const newTask = {
     policy: '',
     task: '',
+    description: '',
     periodicity: 'MONTHLY',
     due_date: `${yyyy}-${mm}-${dd}`,
+    initial_due_date: `${yyyy}-${mm}-${dd}`,
     completed_by: '',
     verified_by: ''
   };
   tasksData.push(newTask);
+  // Record action for undo: addTask at this index
+  actionHistory.push({ type: 'addTask', index: tasksData.length - 1 });
   // Persist new task to persistent storage so it survives updates
   try {
     localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
@@ -790,6 +834,9 @@ function highlightRow(index) {
  * @param {number} index Row index to edit
  */
 function startEditRow(index) {
+  // Before entering edit mode, save a deep copy of the task so it can be
+  // restored if the edit is undone later.
+  editingBackup = JSON.parse(JSON.stringify(tasksData[index]));
   editingRowIndex = index;
   buildTaskList(tasksData);
   // Ensure the row is visible when editing begins
@@ -805,6 +852,11 @@ function startEditRow(index) {
  * @param {number} index Row index being edited
  */
 function finishEditRow(index) {
+  // Record an edit action with the original task prior to editing
+  if (editingBackup) {
+    actionHistory.push({ type: 'editTask', index: index, prevTask: editingBackup });
+    editingBackup = null;
+  }
   // Clear editing state
   editingRowIndex = null;
   // Persist tasksData modifications to persistent storage
@@ -1266,6 +1318,82 @@ function createCalendar(tasksData, saved) {
   calendarDiv.appendChild(table);
 }
 
+/**
+ * Undo the most recent user action.  Supported actions are:
+ *  - addTask: remove the newly added task
+ *  - deleteTask: restore a previously deleted task
+ *  - editTask: revert a task to its previous state
+ *  - complete: restore a task's due date and remove its completion record
+ *
+ * After undoing, the task list, calendar, and history table are refreshed.
+ */
+function undoLastAction() {
+  if (actionHistory.length === 0) {
+    // Nothing to undo
+    alert('Nothing to undo');
+    return;
+  }
+  const action = actionHistory.pop();
+  switch (action.type) {
+    case 'addTask':
+      // Remove the added task
+      if (typeof action.index === 'number') {
+        tasksData.splice(action.index, 1);
+      }
+      break;
+    case 'deleteTask':
+      // Restore the deleted task at its original index
+      if (typeof action.index === 'number' && action.task) {
+        tasksData.splice(action.index, 0, action.task);
+      }
+      break;
+    case 'editTask':
+      // Restore the task's previous state
+      if (typeof action.index === 'number' && action.prevTask) {
+        tasksData[action.index] = action.prevTask;
+      }
+      break;
+    case 'complete':
+      // Restore the previous due date
+      if (typeof action.index === 'number' && action.previousDueDate) {
+        tasksData[action.index].due_date = action.previousDueDate;
+      }
+      // Restore the saved names for this task (if available)
+      if (typeof action.index === 'number' && action.previousSaved) {
+        saved[action.index] = {
+          completed_by: action.previousSaved.completed_by || '',
+          verified_by: action.previousSaved.verified_by || ''
+        };
+      }
+      // Remove the most recent completion record matching this index and due date
+      for (let i = completedTasks.length - 1; i >= 0; i--) {
+        const rec = completedTasks[i];
+        if (rec.index === action.index && rec.due_date === action.previousDueDate) {
+          completedTasks.splice(i, 1);
+          break;
+        }
+      }
+      // Persist updated completed tasks and saved names
+      try {
+        localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
+      } catch (e) {}
+      try {
+        localStorage.setItem('taskStatus', JSON.stringify(saved));
+      } catch (e) {}
+      break;
+    default:
+      break;
+  }
+  // Persist updated tasks
+  try {
+    localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
+  } catch (e) {}
+  // Refresh UI to reflect undo
+  buildTaskList(tasksData);
+  renderCalendar(tasksData);
+  buildCompletedTable();
+}
+
 // Base64 encoded tasks JSON
 const base64Tasks = `
 WwogIHsKICAgICJwb2xpY3kiOiAiQWNjZXNzIENvbnRyb2wgUG9saWN5IiwKICAgICJ0YXNrIjogIlJvbGUgYXNzaWdubWVudHMgYXJlIHJldmFsaWRhdGVk
@@ -1611,504 +1739,630 @@ const defaultMonitoringTasks = [
   {
     "policy": "Monitoring",
     "task": "Correlated audit log reviews",
+    "description": "Routine correlation of audit logs every week and after high severity alerts【486474582159446†L1108-L1114】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Vulnerability and threat scans",
+    "description": "Weekly vulnerability scans; antivirus scans at each login and full scan weekly【486474582159446†L1792-L1811】【486474582159446†L3369-L3392】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Threat-hunting queries",
+    "description": "Execute daily correlation rules and weekly threat-hunting queries【486474582159446†L1901-L1903】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Log and anomaly reviews",
+    "description": "Security team reviews logs and investigates anomalies weekly【486474582159446†L2238-L2239】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Mobile device exceptions",
+    "description": "ISSO reviews weekly Intune exception reports for non-compliant devices【486474582159446†L4268-L4278】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Payment system logs",
+    "description": "Manual log review weekly with automated alerts【486474582159446†L4469-L4472】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Risk and POAM checks",
+    "description": "Risk status and POAM reviewed weekly【486474582159446†L5568-L5581】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "User-account reconciliation",
+    "description": "Weekly reconciliation of HR roster vs AD; weekly anomaly reports【486474582159446†L6421-L6423】【486474582159446†L6574-L6584】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Messaging patterns",
+    "description": "IT Security reviews weekly usage patterns for anomalies【486474582159446†L6728-L6731】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Card-data purge report",
+    "description": "Expired card data purged or tokenized nightly; weekly audit report【486474582159446†L4388-L4396】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Audit-log export",
+    "description": "Weekly export of log actions in retention repositories【486474582159446†L5273-L5280】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Laptop dashboards review",
+    "description": "SOC reviews laptop security dashboards weekly【486474582159446†L3427-L3429】",
     "periodicity": "WEEKLY",
     "due_date": "2025-11-12",
+    "initial_due_date": "2025-11-12",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Visitor-log review",
+    "description": "CISO reviews visitor logs monthly【486474582159446†L540-L564】【486474582159446†L4714-L4716】",
     "periodicity": "MONTHLY",
     "due_date": "2025-12-05",
+    "initial_due_date": "2025-12-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Payment-access reconciliation",
+    "description": "Monthly reconciliation of payment system access lists【486474582159446†L4411-L4413】",
     "periodicity": "MONTHLY",
     "due_date": "2025-12-05",
+    "initial_due_date": "2025-12-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Mobile-asset reconciliation",
+    "description": "Monthly reconciliation of mobile device inventory【486474582159446†L4079-L4094】",
     "periodicity": "MONTHLY",
     "due_date": "2025-12-05",
+    "initial_due_date": "2025-12-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Patch report",
+    "description": "Monthly patch report ensures timely remediation of vulnerabilities【486474582159446†L3364-L3375】",
     "periodicity": "MONTHLY",
     "due_date": "2025-12-05",
+    "initial_due_date": "2025-12-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Social-media monitoring",
+    "description": "IT Security and Marketing monthly reviews【486474582159446†L5720-L5726】",
     "periodicity": "MONTHLY",
     "due_date": "2025-12-05",
+    "initial_due_date": "2025-12-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Unauthorized-software scans",
+    "description": "Intune scans and IT reviews monthly for unauthorized software【486474582159446†L5724-L5726】【486474582159446†L3774-L3775】",
     "periodicity": "MONTHLY",
     "due_date": "2025-12-05",
+    "initial_due_date": "2025-12-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Card-statement reconciliation",
+    "description": "Reconcile card statements monthly【486474582159446†L4611-L4613】",
     "periodicity": "MONTHLY",
     "due_date": "2025-12-05",
+    "initial_due_date": "2025-12-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "License inventory check",
+    "description": "Monthly review of license inventory and renewal reminders【486474582159446†L3811-L3816】",
     "periodicity": "MONTHLY",
     "due_date": "2025-12-05",
+    "initial_due_date": "2025-12-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "General log reviews",
+    "description": "Monthly log reviews to detect anomalies【486474582159446†L6085-L6099】",
     "periodicity": "MONTHLY",
     "due_date": "2025-12-05",
+    "initial_due_date": "2025-12-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Security trend report",
+    "description": "Security team monthly trend report on anomalies【486474582159446†L6541-L6543】",
     "periodicity": "MONTHLY",
     "due_date": "2025-12-05",
+    "initial_due_date": "2025-12-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Privileged-account review",
+    "description": "Quarterly review of privileged accounts (CUI semi-annual, full annual)【486474582159446†L569-L575】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Asset-inventory audit",
+    "description": "Quarterly IT asset inventory audit【486474582159446†L813-L814】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Resource-access audit",
+    "description": "Quarterly review of resource access【486474582159446†L945-L947】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Audit-log review",
+    "description": "Quarterly review of audit logs and after changes【486474582159446†L1056-L1067】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Training metrics",
+    "description": "Quarterly report of training metrics【486474582159446†L1292-L1296】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Configuration audits",
+    "description": "Quarterly configuration audits and baseline checks【486474582159446†L1531-L1533】【486474582159446†L1664-L1671】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Device-inventory reconciliation",
+    "description": "Quarterly device inventory and semi-annual baseline update【486474582159446†L1742-L1770】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Group-membership review",
+    "description": "Quarterly group membership review and alignment【486474582159446†L6578-L6584】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "180-day log review",
+    "description": "Quarterly 180-day log retention check【486474582159446†L6421-L6423】【486474582159446†L6447-L6453】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "License reconciliation",
+    "description": "Quarterly reconciliation of licenses【486474582159446†L3811-L3816】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Payment-system tests",
+    "description": "Quarterly tests of payment systems【486474582159446†L4469-L4472】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Vulnerability scans (CUI)",
+    "description": "Quarterly vulnerability scans on controlled unclassified information systems【486474582159446†L1792-L1811】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Backup-integrity check",
+    "description": "Quarterly SHA-256 checksum integrity checks of backups【486474582159446†L5115-L5118】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Key-register audit",
+    "description": "Quarterly physical key register audit【486474582159446†L5232-L5235】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Threat Snapshot briefing",
+    "description": "Quarterly security briefings【486474582159446†L4301-L4305】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Retention access review",
+    "description": "Quarterly access review of retention repositories【486474582159446†L5273-L5285】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Manager access attestation",
+    "description": "Quarterly manager access attestation【486474582159446†L6565-L6567】",
     "periodicity": "QUARTERLY",
     "due_date": "2026-02-03",
+    "initial_due_date": "2026-02-03",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "CUI access certification",
+    "description": "Semi-annual CUI access review and revalidation【486474582159446†L569-L575】【486474582159446†L6545-L6547】",
     "periodicity": "SEMIANNUALLY",
     "due_date": "2026-05-04",
+    "initial_due_date": "2026-05-04",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Privileged-role review",
+    "description": "CISO reviews privileged roles twice annually【486474582159446†L720-L724】",
     "periodicity": "SEMIANNUALLY",
     "due_date": "2026-05-04",
+    "initial_due_date": "2026-05-04",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Baseline image update",
+    "description": "Semi-annual update of baseline images【486474582159446†L1766-L1770】",
     "periodicity": "SEMIANNUALLY",
     "due_date": "2026-05-04",
+    "initial_due_date": "2026-05-04",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Laptop-fleet compliance",
+    "description": "Semi-annual audit of 15% of laptop fleet【486474582159446†L3624-L3629】",
     "periodicity": "SEMIANNUALLY",
     "due_date": "2026-05-04",
+    "initial_due_date": "2026-05-04",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Messaging-policy audit",
+    "description": "Semi-annual messaging policy audits【486474582159446†L6779-L6782】",
     "periodicity": "SEMIANNUALLY",
     "due_date": "2026-05-04",
+    "initial_due_date": "2026-05-04",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "VPN & patch audit",
+    "description": "Biannual audit of VPN and patch management logs【486474582159446†L2555-L2559】",
     "periodicity": "SEMIANNUALLY",
     "due_date": "2026-05-04",
+    "initial_due_date": "2026-05-04",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Mobile compliance audit",
+    "description": "Biannual Intune compliance audits and policy acknowledgments【486474582159446†L4305-L4333】",
     "periodicity": "SEMIANNUALLY",
     "due_date": "2026-05-04",
+    "initial_due_date": "2026-05-04",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Physical-records audit",
+    "description": "Semi-annual 10% sample audit of physical records【486474582159446†L5199-L5203】",
     "periodicity": "SEMIANNUALLY",
     "due_date": "2026-05-04",
+    "initial_due_date": "2026-05-04",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Security training",
+    "description": "Annual security training and content updates【486474582159446†L1226-L1313】",
     "periodicity": "ANNUALLY",
     "due_date": "2026-11-05",
+    "initial_due_date": "2026-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Laptop inventory audit",
+    "description": "Annual audit of laptop inventory【486474582159446†L3298-L3331】",
     "periodicity": "ANNUALLY",
     "due_date": "2026-11-05",
+    "initial_due_date": "2026-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "License compliance attestation",
+    "description": "Annual license compliance for third-party applications【486474582159446†L3828-L3832】",
     "periodicity": "ANNUALLY",
     "due_date": "2026-11-05",
+    "initial_due_date": "2026-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Encryption key rotation",
+    "description": "Annual rotation of payment-system encryption keys【486474582159446†L4431-L4432】",
     "periodicity": "ANNUALLY",
     "due_date": "2026-11-05",
+    "initial_due_date": "2026-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Supplier risk assessment",
+    "description": "Annual risk assessment of suppliers and SOC2/PCI reviews【486474582159446†L4518-L4522】",
     "periodicity": "ANNUALLY",
     "due_date": "2026-11-05",
+    "initial_due_date": "2026-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Retention governance",
+    "description": "Annual retention test, audits and policy review【486474582159446†L5200-L5252】【486474582159446†L5320-L5327】",
     "periodicity": "ANNUALLY",
     "due_date": "2026-11-05",
+    "initial_due_date": "2026-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Policy and system audits",
+    "description": "Annual full policy and system audits【486474582159446†L5576-L5580】",
     "periodicity": "ANNUALLY",
     "due_date": "2026-11-05",
+    "initial_due_date": "2026-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Threat intel & encryption review",
+    "description": "Annual review of threat intelligence and encryption configuration【486474582159446†L6219-L6255】【486474582159446†L6299-L6307】",
     "periodicity": "ANNUALLY",
     "due_date": "2026-11-05",
+    "initial_due_date": "2026-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Cyber awareness training",
+    "description": "Annual cyber awareness training for all personnel【486474582159446†L6269-L6272】",
     "periodicity": "ANNUALLY",
     "due_date": "2026-11-05",
+    "initial_due_date": "2026-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Password rotation",
+    "description": "365-day rotation for standard users, 90-day rotation for privileged/service accounts and 30-day expiration for test accounts【486474582159446†L6427-L6432】【486474582159446†L6977-L7078】",
     "periodicity": "OTHER",
     "due_date": "2025-11-05",
+    "initial_due_date": "2025-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "30-day new-hire audit",
+    "description": "Permissions audit 30 days after onboarding【486474582159446†L6421-L6423】",
     "periodicity": "OTHER",
     "due_date": "2025-11-05",
+    "initial_due_date": "2025-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Critical patching",
+    "description": "Critical patches within 7 days, high within 14 days, medium/low within 30 days【486474582159446†L3364-L3375】【486474582159446†L6750-L6752】",
     "periodicity": "OTHER",
     "due_date": "2025-11-05",
+    "initial_due_date": "2025-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Telemetry & logs",
+    "description": "Telemetry sent every 4 hours; logs forwarded within 5 minutes【486474582159446†L4267-L4278】【486474582159446†L6538-L6540】",
     "periodicity": "OTHER",
     "due_date": "2025-11-05",
+    "initial_due_date": "2025-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Backup schedule",
+    "description": "Mon-Thu incremental, full Friday backups, replicate to AWS within 4 hours【486474582159446†L5110-L5113】",
     "periodicity": "OTHER",
     "due_date": "2025-11-05",
+    "initial_due_date": "2025-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Card-data purge",
+    "description": "Nightly purge/tokenization of card data【486474582159446†L4388-L4396】",
     "periodicity": "OTHER",
     "due_date": "2025-11-05",
+    "initial_due_date": "2025-11-05",
     "completed_by": "",
     "verified_by": ""
   },
   {
     "policy": "Monitoring",
     "task": "Break-glass review",
+    "description": "Post-incident review within 24 hours for emergency access【486474582159446†L6511-L6513】",
     "periodicity": "OTHER",
     "due_date": "2025-11-05",
+    "initial_due_date": "2025-11-05",
     "completed_by": "",
     "verified_by": ""
   }
