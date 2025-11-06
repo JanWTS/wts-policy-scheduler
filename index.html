@@ -177,6 +177,20 @@
       background-color: #fff9c4 !important;
     }
 
+    /* Row color coding to mirror calendar status */
+    tr.row-completed {
+      background-color: #c8e6c9;
+    }
+    tr.row-overdue {
+      background-color: #ffcdd2;
+    }
+    tr.row-due-today {
+      background-color: #fff9c4;
+    }
+    tr.row-pending {
+      background-color: #e3f2fd;
+    }
+
     /* Controls above the task list for filtering and editing */
     .list-controls {
       margin: 0.5rem 0 1rem 0;
@@ -209,6 +223,24 @@
     }
     .edit-icon:hover {
       color: #004d80;
+    }
+
+    /* Row colors for task list corresponding to calendar statuses */
+    .row-completed {
+      /* light green for completed tasks */
+      background-color: #c8e6c9 !important;
+    }
+    .row-pending {
+      /* light blue for upcoming tasks */
+      background-color: #e3f2fd !important;
+    }
+    .row-overdue {
+      /* light red for overdue tasks */
+      background-color: #ffcdd2 !important;
+    }
+    .row-due-today {
+      /* light yellow for tasks due today */
+      background-color: #fff9c4 !important;
     }
   </style>
 </head>

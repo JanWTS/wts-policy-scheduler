@@ -141,9 +141,9 @@ function completeTask(idx) {
     // If no next date (e.g. OTHER), clear the due_date so it no longer shows in the list
     tasksData[idx].due_date = '';
   }
-  // Persist updated tasks
+  // Persist updated tasks to persistent storage
   try {
-    localStorage.setItem('customTasks', JSON.stringify(tasksData));
+    localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
   } catch (e) {}
   // Refresh UI
   buildTaskList(tasksData);
@@ -409,6 +409,23 @@ function buildTaskList(tasksData) {
       return;
     }
     const row = document.createElement('tr');
+    // Determine row status based on due date and completion
+    const dueStr = task.due_date;
+    if (dueStr) {
+      // Compute status relative to today
+      const todayStrRow = new Date().toISOString().slice(0, 10);
+      let status;
+      if (isTaskCompleted(idx, dueStr)) {
+        status = 'completed';
+      } else if (dueStr < todayStrRow) {
+        status = 'overdue';
+      } else if (dueStr === todayStrRow) {
+        status = 'due-today';
+      } else {
+        status = 'pending';
+      }
+      row.classList.add('row-' + status);
+    }
     // Index column
     const idxTd = document.createElement('td');
     idxTd.textContent = idx + 1;
@@ -524,9 +541,9 @@ function buildTaskList(tasksData) {
           // Remove the task from the array
           tasksData.splice(idx, 1);
           editingRowIndex = null;
-          // Persist changes
+          // Persist changes to persistent storage
           try {
-            localStorage.setItem('customTasks', JSON.stringify(tasksData));
+            localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
           } catch (e) {}
           // Rebuild list and update calendar
           buildTaskList(tasksData);
@@ -555,6 +572,32 @@ function buildTaskList(tasksData) {
     tbody.appendChild(row);
     // Store row for highlighting later
     rowElements[idx] = row;
+
+    // -----------------------------------------------------------------
+    // Determine row status based on due date and completion status.
+    // We apply the same color scheme used in the calendar to the
+    // corresponding row in the task list.  If a name has been entered
+    // in the "Completed By" field for this task (saved via localStorage),
+    // the row is marked as completed (green).  Otherwise we compare
+    // the task's due_date to today's date to classify it as overdue
+    // (red), due today (yellow) or pending (light blue).
+    let statusClass = '';
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const savedRecord = saved[idx] || {};
+    if (savedRecord.completed_by && savedRecord.completed_by.trim() !== '') {
+      statusClass = 'row-completed';
+    } else if (task.due_date) {
+      if (task.due_date < todayStr) {
+        statusClass = 'row-overdue';
+      } else if (task.due_date === todayStr) {
+        statusClass = 'row-due-today';
+      } else {
+        statusClass = 'row-pending';
+      }
+    }
+    if (statusClass) {
+      row.classList.add(statusClass);
+    }
   });
   // Apply filter to show/hide rows based on current selection
   applyFilter();
@@ -609,6 +652,12 @@ function addTaskRow(tasksData) {
     verified_by: ''
   };
   tasksData.push(newTask);
+  // Persist new task to persistent storage so it survives updates
+  try {
+    localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
+  } catch (e) {
+    // ignore storage errors
+  }
   // Start editing the newly added row
   editingRowIndex = tasksData.length - 1;
   buildTaskList(tasksData);
@@ -758,9 +807,9 @@ function startEditRow(index) {
 function finishEditRow(index) {
   // Clear editing state
   editingRowIndex = null;
-  // Persist tasksData modifications
+  // Persist tasksData modifications to persistent storage
   try {
-    localStorage.setItem('customTasks', JSON.stringify(tasksData));
+    localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
   } catch (e) {
     // ignore storage errors
   }
@@ -2067,36 +2116,79 @@ const defaultMonitoringTasks = [
 
 // Override the default policy tasks with the Monitoring tasks derived above.
 // We assign tasksData to our defaultMonitoringTasks here so that the scheduler
-// uses the new list instead of the encoded WTS tasks.  The subsequent
-// localStorage override will replace tasksData with user-edited tasks if any.
+// uses the new list instead of the encoded WTS tasks.  After this assignment
+// we attempt to merge in any tasks previously saved by the user (persistentTasks)
+// so that user-added or edited entries are not lost across updates.
 tasksData = defaultMonitoringTasks;
-// Override tasksData with any custom tasks stored in localStorage.
-try {
-  const stored = localStorage.getItem('customTasks');
-  if (stored) {
-    const parsed = JSON.parse(stored);
-    if (Array.isArray(parsed)) {
-      // Only use saved custom tasks if they match the Monitoring dataset.  If
-      // the saved tasks come from a previous policy import (e.g., the WTS
-      // default tasks), ignore them and fall back to the defaultMonitoringTasks.
-      const allMonitoring = parsed.length > 0 && parsed.every(t => t.policy === 'Monitoring');
-      if (allMonitoring) {
-        tasksData = parsed;
-        // Normalize periodicity on loaded custom tasks
-        tasksData.forEach((task) => {
-          if (task.periodicity) {
-            task.periodicity = task.periodicity.toString().toUpperCase();
-          }
-        });
-      } else {
-        // Clear out incompatible saved tasks
-        localStorage.removeItem('customTasks');
-        // tasksData remains defaultMonitoringTasks
-      }
+
+/**
+ * Merge the default tasks with any persistent tasks stored in localStorage.
+ *
+ * This function attempts to retrieve the array of tasks previously saved under
+ * the key "persistentTasks".  If found, it merges the default tasks with
+ * the persistent tasks: any default task that does not already exist in the
+ * persistent array (matching on policy, task description, initial due date
+ * or due date, and periodicity) is appended to the persistent array.
+ * If no persistent tasks are stored, the default tasks are saved under the
+ * "persistentTasks" key and returned unchanged.
+ *
+ * @param {Array} defaults Default tasks loaded from the current code
+ * @returns {Array} Merged array of tasks
+ */
+function mergeWithPersistentTasks(defaults) {
+  let persistent = [];
+  try {
+    const stored = localStorage.getItem('persistentTasks');
+    if (stored) {
+      persistent = JSON.parse(stored);
     }
+  } catch (e) {
+    persistent = [];
   }
+  if (Array.isArray(persistent) && persistent.length > 0) {
+    // Add any default task that does not already exist in persistent tasks.
+    defaults.forEach(defTask => {
+      const defInit = defTask.initial_due_date || defTask.due_date || '';
+      const exists = persistent.some(pt => {
+        const ptInit = pt.initial_due_date || pt.due_date || '';
+        return pt.policy === defTask.policy &&
+               pt.task === defTask.task &&
+               ptInit === defInit &&
+               pt.periodicity === defTask.periodicity;
+      });
+      if (!exists) {
+        persistent.push(defTask);
+      }
+    });
+    return persistent;
+  } else {
+    // Save default tasks as the initial persistent tasks
+    try {
+      localStorage.setItem('persistentTasks', JSON.stringify(defaults));
+    } catch (e) {
+      // ignore storage errors
+    }
+    return defaults;
+  }
+}
+
+// Merge default tasks with persistent tasks
+try {
+  tasksData = mergeWithPersistentTasks(defaultMonitoringTasks);
+  // Normalize periodicity on all tasks
+  tasksData.forEach((task) => {
+    if (task.periodicity) {
+      task.periodicity = task.periodicity.toString().toUpperCase();
+    }
+  });
 } catch (e) {
-  // ignore JSON parse/storage errors
+  // On error, just use default tasks
+  tasksData = defaultMonitoringTasks;
+  tasksData.forEach((task) => {
+    if (task.periodicity) {
+      task.periodicity = task.periodicity.toString().toUpperCase();
+    }
+  });
 }
 
 // Initialize the application when the DOM is ready.  If the DOM has already
