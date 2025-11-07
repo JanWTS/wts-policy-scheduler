@@ -1,353 +1,308 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WTS-Policy-Scheduler</title>
-  <!--
-    Note: We intentionally avoid external dependencies such as FullCalendar here because
-    the application must run offline.  A simple month grid is implemented in
-    tasks.js and styled via the classes defined below.
-  -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Policy Task List — UI Enhancements Demo</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f5f5f5;
-    }
-    header {
-      background-color: #004d80;
-      color: #fff;
-      padding: 1rem;
-      text-align: center;
-    }
-    .layout {
-      display: flex;
-      min-height: calc(100vh - 80px); /* account for header height */
-    }
-    #main-area {
-      flex: 1;
-      padding: 1rem;
-      overflow-y: auto;
-    }
-    #sidebar {
-      width: 180px;
-      background-color: #f7f9fb;
-      border-left: 1px solid #ddd;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      padding: 1rem 0;
-      /* Keep the side panel visible while scrolling */
-      position: sticky;
-      top: 0;
-      align-self: flex-start;
-    }
-    #sidebar button {
-      margin: 0.5rem 1rem;
-      padding: 0.5rem;
-      border: none;
-      border-radius: 4px;
-      background-color: #004d80;
-      color: #fff;
-      cursor: pointer;
-      font-size: 0.9em;
-    }
-    #sidebar button.active {
-      background-color: #0066a3;
-    }
-    /* Shared table styling for task list */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 1rem;
-      background: #fff;
-      border: 1px solid #ddd;
-    }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      text-align: left;
-    }
-    th {
-      background-color: #f2f2f2;
-    }
-    tr:nth-child(even) {
-      background-color: #fafafa;
-    }
-    input[type="text"] {
-      width: 95%;
-      padding: 6px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+    :root {
+      --bg: #f6f7f8;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #0ea5e9; /* sky-500 */
+      --danger: #ef4444; /* red-500 */
+      --success: #22c55e; /* green-500 */
+      --warning: #f59e0b; /* amber-500 */
+      --radius: 14px;
+      --shadow: 0 6px 18px rgba(17, 24, 39, 0.08);
+      --sticky-shadow: 0 10px 20px rgba(0,0,0,.06);
+      --icon-size: 22px;           /* ↑ larger button icon size */
+      --icon-size-lg: 24px;        /* task list icon size */
+      --btn-padding: 8px 12px;
     }
 
-    /* Styles for our custom calendar grid */
-    .calendar-grid {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      margin-top: 1rem;
-      background: #fff;
-    }
-    .calendar-grid th,
-    .calendar-grid td {
-      border: 1px solid #ddd;
-      vertical-align: top;
-      height: 100px;
-      padding: 2px;
-    }
-    .calendar-grid th {
-      background-color: #f2f2f2;
-      text-align: center;
-      font-weight: bold;
-    }
-    .date-number {
-      font-weight: bold;
-      margin-bottom: 4px;
-    }
-    .task-item {
-      font-size: 0.75em;
-      margin-bottom: 3px;
-      padding: 2px 4px;
-      border-radius: 4px;
-      color: #333;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-    }
-    .task-item.completed {
-      background-color: #c8e6c9;
-      border-left: 4px solid #388e3c;
-    }
-    .task-item.pending {
-      /* Pending tasks (future) show a neutral/light blue color */
-      background-color: #e3f2fd;
-      border-left: 4px solid #64b5f6;
+    html, body {
+      margin: 0; padding: 0; background: var(--bg); color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
     }
 
-    /* Overdue tasks (past due and not completed) show red */
-    .task-item.overdue {
-      background-color: #ffcdd2;
-      border-left: 4px solid #d32f2f;
+    .container { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+
+    /* Header: now sticky so it follows the user while scrolling */
+    .tasklist-header {
+      position: sticky; top: 0; z-index: 20;
+      background: var(--panel);
+      margin: 0 -16px 18px; /* extend edge-to-edge while keeping body padded */
+      padding: 18px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      box-shadow: var(--sticky-shadow);
     }
 
-    /* Tasks due today are highlighted in yellow */
-    .task-item.due-today {
-      background-color: #fff9c4;
-      border-left: 4px solid #fbc02d;
+    h1 { font-size: 28px; margin: 0 0 6px; }
+    .subhead { color: var(--muted); margin: 6px 0 14px; }
+
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    select, button, input[type="text"] {
+      border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: var(--text);
+      padding: 10px 12px; font-size: 14px;
     }
 
-    /* Styles for list and calendar sections */
-    .view-section {
-      display: none;
-    }
-    .view-section.active {
-      display: block;
-    }
-    /* Calendar controls styling */
-    #calendar-controls {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 0.5rem;
-      flex-wrap: wrap;
-    }
-    #calendar-controls .nav-buttons,
-    #calendar-controls .view-buttons {
-      display: flex;
-      gap: 0.5rem;
-    }
-    #calendar-controls button {
-      padding: 0.3rem 0.6rem;
-      border: 1px solid #ddd;
-      background: #fff;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.85em;
-    }
-    #calendar-controls button.active {
-      background-color: #004d80;
-      color: #fff;
-      border-color: #004d80;
-    }
-    /* Highlight row in task list when selected from calendar */
-    tr.highlight {
-      background-color: #fff9c4 !important;
-    }
+    .btn { cursor: pointer; padding: var(--btn-padding); border: 1px solid #e5e7eb; background: #fff; border-radius: 999px; display: inline-flex; align-items: center; gap: 8px; transition: transform .05s ease, box-shadow .2s ease; }
+    .btn:hover { box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-ghost { background: #fff; }
+    .btn-danger { background: #fff; border-color: #fecaca; }
 
-    /* Row color coding to mirror calendar status */
-    tr.row-completed {
-      background-color: #c8e6c9;
-    }
-    tr.row-overdue {
-      background-color: #ffcdd2;
-    }
-    tr.row-due-today {
-      background-color: #fff9c4;
-    }
-    tr.row-pending {
-      background-color: #e3f2fd;
-    }
+    .btn .icon { width: var(--icon-size-lg); height: var(--icon-size-lg); display: inline-block; }
 
-    /* Controls above the task list for filtering and editing */
-    .list-controls {
-      margin: 0.5rem 0 1rem 0;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem;
-      /* Make the filter and add buttons stick to the top while scrolling */
-      position: sticky;
-      top: 0;
-      background-color: #fff;
-      padding: 0.5rem 0;
-      z-index: 10;
-    }
-    .list-controls label {
-      font-weight: bold;
-    }
-    .list-controls select,
-    .list-controls button {
-      padding: 0.3rem 0.5rem;
-      font-size: 0.9rem;
-    }
+    /* Cards */
+    .panel { background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
 
-    /* Styling for edit icon in each row */
-    .edit-icon {
-      font-size: 1.2em;
-      cursor: pointer;
-      color: #0066a3;
-      margin-left: 0.5rem;
-    }
-    .edit-icon:hover {
-      color: #004d80;
-    }
+    .stack { display: grid; gap: 12px; }
 
-    /* Row colors for task list corresponding to calendar statuses */
-    .row-completed {
-      /* light green for completed tasks */
-      background-color: #c8e6c9 !important;
+    /* Task rows */
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 12px 10px; border: 1px solid #e5e7eb; border-radius: 12px; }
+    .row[aria-disabled="true"] { opacity: .5; }
+
+    .row-title { font-weight: 600; }
+    .row-meta { color: var(--muted); font-size: 12px; }
+
+    .row-actions { display: inline-flex; gap: 8px; }
+
+    /* History list with per-entry delete button */
+    .history { list-style: none; padding: 0; margin: 0; }
+    .history li { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px dashed #e5e7eb; border-radius: 12px; background: #fff; }
+
+    .history .btn-icon, .row-actions .btn-icon { width: 36px; height: 36px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; }
+    .btn-danger .icon, .btn-icon .icon { width: var(--icon-size); height: var(--icon-size); }
+
+    .btn-danger { color: var(--danger); }
+    .btn-complete { color: var(--success); border-color: #bbf7d0; }
+    .btn-finish { color: var(--warning); border-color: #fde68a; }
+
+    /* Hover tooltips for delete/complete/finish */
+    .has-tooltip { position: relative; }
+    .has-tooltip::after {
+      content: attr(data-tooltip);
+      position: absolute; left: 50%; bottom: calc(100% + 8px);
+      transform: translateX(-50%);
+      background: #111827; color: #fff; padding: 6px 8px; font-size: 12px; border-radius: 8px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s ease, transform .15s ease; transform-origin: bottom center; scale: .98;
     }
-    .row-pending {
-      /* light blue for upcoming tasks */
-      background-color: #e3f2fd !important;
-    }
-    .row-overdue {
-      /* light red for overdue tasks */
-      background-color: #ffcdd2 !important;
-    }
-    .row-due-today {
-      /* light yellow for tasks due today */
-      background-color: #fff9c4 !important;
-    }
+    .has-tooltip:hover::after { opacity: 1; scale: 1; }
+
+    /* Utility */
+    .muted { color: var(--muted); }
+    .spacer { height: 24px; }
   </style>
 </head>
 <body>
-  <header>
-    <!-- Updated header title to fix typo and simplify name -->
-    <h1>WTS-Policy-Scheduler</h1>
-    <p>Track periodic tasks across all policies and stay up to date</p>
-  </header>
-  <div class="layout">
-    <!-- Main content area -->
-    <div id="main-area">
-      <!-- Calendar view section -->
-      <div id="calendar-view" class="view-section active">
-        <div id="calendar-controls">
-          <div class="nav-buttons">
-            <button id="prev-btn">Prev</button>
-            <button id="today-btn">Today</button>
-            <button id="next-btn">Next</button>
-          </div>
-          <div class="view-buttons">
-            <button id="month-view-btn" class="active">Month</button>
-            <button id="week-view-btn">Week</button>
-            <button id="day-view-btn">Day</button>
-          </div>
-        </div>
-        <div id="calendar"></div>
+  <div class="container">
+    <!-- Sticky header -->
+    <header class="tasklist-header panel" role="region" aria-label="Policy Task List header">
+      <h1>Policy Task List</h1>
+      <p class="subhead">Enter the names of the person completing each task and the verifier. Your entries are stored in your browser.</p>
+      <div class="controls">
+        <label for="filter"><span class="muted">Filter by periodicity:</span></label>
+        <select id="filter" aria-label="Filter tasks by periodicity">
+          <option value="All">All</option>
+          <option value="Weekly">Weekly</option>
+          <option value="Monthly">Monthly</option>
+          <option value="Quarterly">Quarterly</option>
+          <option value="Annually">Annually</option>
+          <option value="Semi-Annually">Semi-Annually</option>
+        </select>
+        <button id="addTask" class="btn btn-primary has-tooltip" data-tooltip="Add a new task">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add Task
+        </button>
+        <button id="undoBtn" class="btn btn-ghost has-tooltip" data-tooltip="Undo last change" aria-label="Undo">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-5-5 5-5"/><path d="M20 20v-5a7 7 0 0 0-7-7H4"/></svg>
+          Undo
+        </button>
       </div>
-      <!-- Task list view section -->
-      <div id="list-view" class="view-section">
-        <h2>Policy Task List</h2>
-        <p>Enter the names of the person completing each task and the verifier. Your entries will be stored in your browser.</p>
-        <!-- Controls for filtering and editing tasks -->
-        <div class="list-controls">
-          <label for="periodicityFilter">Filter by periodicity:</label>
-          <select id="periodicityFilter">
-            <option value="All">All</option>
-            <option value="DAILY">DAILY</option>
-            <option value="WEEKLY">WEEKLY</option>
-            <option value="MONTHLY">MONTHLY</option>
-            <option value="QUARTERLY">QUARTERLY</option>
-            <option value="SEMIANNUALLY">SEMIANNUALLY</option>
-            <option value="ANNUALLY">ANNUALLY</option>
-            <option value="OTHER">OTHER</option>
-          </select>
-          <!-- Removed global Edit Tasks button; editing is now per-row -->
-          <button id="add-task-btn" type="button">Add Task</button>
-          <!-- Undo button to revert the most recent change -->
-          <button id="undo-btn" type="button">Undo</button>
-        </div>
-        <table id="task-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Policy</th>
-              <th>Title</th>
-              <th>Description</th>
-              <th>Periodicity</th>
-              <th>Due Date</th>
-              <th>Completed By</th>
-              <th>Verified By</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <!-- New inventory view section -->
-      <div id="inventory-view" class="view-section">
-        <h2>Inventory List</h2>
-        <p>This table shows all inventory items from the office inventory sheet.</p>
-        <table id="inventory-table" class="inventory-table">
-          <!-- Table content will be generated via tasks.js -->
-        </table>
-      </div>
+    </header>
 
-      <!-- New members view section -->
-      <div id="members-view" class="view-section">
-        <h2>Team Members</h2>
-        <p>This table lists team members and their assigned assets from the inventory.</p>
-        <table id="members-table" class="members-table">
-          <!-- Table content will be generated via tasks.js -->
-        </table>
-      </div>
+    <main class="stack">
+      <section class="panel">
+        <h2>Tasks</h2>
+        <div id="taskList" class="stack" aria-live="polite"></div>
+      </section>
 
-      <!-- Completed tasks history view section -->
-      <div id="completed-view" class="view-section">
-        <h2>Completed Tasks History</h2>
-        <p>This table lists all completed task occurrences. Use the search box to filter.</p>
-        <!-- Search box for completed tasks -->
-        <input type="text" id="completed-search" placeholder="Search completed tasks..." style="margin-bottom:0.5rem;padding:0.3rem;width:100%;max-width:300px;">
-        <table id="completed-table">
-          <!-- Table content will be generated in tasks.js -->
-        </table>
-      </div>
-    </div>
-    <!-- Sidebar for navigation -->
-    <div id="sidebar">
-      <button id="nav-calendar" class="active">Calendar</button>
-      <button id="nav-list">Task List</button>
-      <!-- Additional buttons for new views -->
-      <button id="nav-inventory">Inventory</button>
-      <button id="nav-members">Members</button>
-      <button id="nav-completed">History</button>
-    </div>
+      <section class="panel">
+        <h2>History</h2>
+        <p class="muted">Your last actions are stored locally. Use the trash icon to remove specific entries.</p>
+        <ul id="historyList" class="history" aria-live="polite"></ul>
+      </section>
+
+      <div class="spacer"></div>
+      <div class="spacer"></div>
+    </main>
   </div>
-  <!-- Our custom tasks and logic -->
-  <script src="tasks.js"></script>
+
+  <script>
+    // --- Minimal demo data & storage helpers ---
+    const STORAGE_TASKS = 'policy_tasks_demo_v1';
+    const STORAGE_HISTORY = 'policy_history_demo_v1';
+
+    const load = (key, fallback) => {
+      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+    };
+    const save = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+
+    let tasks = load(STORAGE_TASKS, [
+      { id: crypto.randomUUID(), title: 'Review access logs', periodicity: 'Weekly', assignee: '', verifier: '', done: false },
+      { id: crypto.randomUUID(), title: 'Validate backups', periodicity: 'Monthly', assignee: '', verifier: '', done: false },
+      { id: crypto.randomUUID(), title: 'Policy review meeting', periodicity: 'Quarterly', assignee: '', verifier: '', done: false },
+    ]);
+
+    let history = load(STORAGE_HISTORY, []);
+    let undoStack = [];
+
+    // --- Rendering ---
+    const $taskList = document.getElementById('taskList');
+    const $history = document.getElementById('historyList');
+
+    function iconCheck() { return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'; }
+    function iconFlag() { return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v18"/><path d="M4 5h11l-1.5 3L15 11H4"/></svg>'; }
+    function iconTrash() { return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>'; }
+
+    function pushHistory(text) {
+      history.unshift({ id: crypto.randomUUID(), text, ts: new Date().toISOString() });
+      history = history.slice(0, 50); // keep last 50
+      save(STORAGE_HISTORY, history);
+      renderHistory();
+    }
+
+    function renderHistory() {
+      $history.innerHTML = '';
+      if (!history.length) {
+        const li = document.createElement('li');
+        li.innerHTML = '<span class="muted">No history yet.</span>';
+        $history.appendChild(li);
+        return;
+      }
+      history.forEach((h, idx) => {
+        const li = document.createElement('li');
+        const left = document.createElement('div');
+        left.innerHTML = `<strong>${h.text}</strong><div class="muted" style="font-size:12px">${new Date(h.ts).toLocaleString()}</div>`;
+        const right = document.createElement('div');
+        right.innerHTML = `<button class="btn btn-icon btn-danger has-tooltip" data-tooltip="Delete this history entry" aria-label="Delete history entry" data-id="${h.id}">${iconTrash()}</button>`;
+        li.appendChild(left); li.appendChild(right);
+        $history.appendChild(li);
+      });
+    }
+
+    function renderTasks() {
+      const filterVal = document.getElementById('filter').value;
+      $taskList.innerHTML = '';
+      tasks
+        .filter(t => filterVal === 'All' ? true : t.periodicity === filterVal)
+        .forEach(t => {
+          const row = document.createElement('div');
+          row.className = 'row';
+          row.setAttribute('data-id', t.id);
+          if (t.done) row.setAttribute('aria-disabled','true');
+
+          const left = document.createElement('div');
+          left.innerHTML = `
+            <div class="row-title">${t.title} <span class="muted">• ${t.periodicity}</span></div>
+            <div class="row-meta">Assignee: <input type="text" value="${t.assignee}" placeholder="Name" aria-label="Assignee" style="margin-right:8px"> Verifier: <input type="text" value="${t.verifier}" placeholder="Name" aria-label="Verifier"></div>
+          `;
+          const right = document.createElement('div');
+          right.className = 'row-actions';
+          right.innerHTML = `
+            <button class="btn btn-icon btn-complete has-tooltip" data-tooltip="Mark complete" aria-label="Complete task" data-action="complete">${iconCheck()}</button>
+            <button class="btn btn-icon btn-finish has-tooltip" data-tooltip="Mark finished & archive" aria-label="Finish task" data-action="finish">${iconFlag()}</button>
+            <button class="btn btn-icon btn-danger has-tooltip" data-tooltip="Delete task" aria-label="Delete task" data-action="delete">${iconTrash()}</button>
+          `;
+
+          row.appendChild(left); row.appendChild(right);
+          $taskList.appendChild(row);
+
+          // Wire up input changes
+          const [assigneeInput, verifierInput] = left.querySelectorAll('input');
+          assigneeInput.addEventListener('change', (e) => updateTask(t.id, { assignee: e.target.value }));
+          verifierInput.addEventListener('change', (e) => updateTask(t.id, { verifier: e.target.value }));
+
+          right.querySelectorAll('button').forEach(btn => btn.addEventListener('click', (e) => onTaskAction(t.id, btn.dataset.action)));
+        });
+    }
+
+    function updateTask(id, patch) {
+      const prev = JSON.parse(JSON.stringify(tasks));
+      undoStack.push(prev);
+      tasks = tasks.map(t => t.id === id ? { ...t, ...patch } : t);
+      save(STORAGE_TASKS, tasks);
+      renderTasks();
+    }
+
+    function onTaskAction(id, action) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      const prev = JSON.parse(JSON.stringify(tasks));
+      undoStack.push(prev);
+
+      if (action === 'delete') {
+        if (confirm(`Delete “${task.title}”?`)) {
+          tasks = tasks.filter(t => t.id !== id);
+          pushHistory(`Deleted task: ${task.title}`);
+        }
+      } else if (action === 'complete') {
+        tasks = tasks.map(t => t.id === id ? { ...t, done: true } : t);
+        pushHistory(`Completed task: ${task.title}`);
+      } else if (action === 'finish') {
+        tasks = tasks.map(t => t.id === id ? { ...t, done: true } : t);
+        pushHistory(`Finished task: ${task.title}`);
+      }
+      save(STORAGE_TASKS, tasks);
+      renderTasks();
+    }
+
+    // Delete a single history entry (per-entry wipe)
+    $history.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-id]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      const entry = history.find(h => h.id === id);
+      if (entry && confirm('Delete this history entry?')) {
+        const prev = JSON.parse(JSON.stringify(history));
+        undoStack.push({ history: prev, tasks: JSON.parse(JSON.stringify(tasks)) });
+        history = history.filter(h => h.id !== id);
+        save(STORAGE_HISTORY, history);
+        renderHistory();
+      }
+    });
+
+    // Controls
+    document.getElementById('filter').addEventListener('change', renderTasks);
+    document.getElementById('addTask').addEventListener('click', () => {
+      const title = prompt('Task name');
+      if (!title) return;
+      const periodicity = prompt('Periodicity (Weekly, Monthly, Quarterly, Annually, Semi-Annually)', 'Monthly') || 'Monthly';
+      const prev = JSON.parse(JSON.stringify(tasks));
+      undoStack.push(prev);
+      tasks.unshift({ id: crypto.randomUUID(), title, periodicity, assignee: '', verifier: '', done: false });
+      save(STORAGE_TASKS, tasks);
+      pushHistory(`Added task: ${title}`);
+      renderTasks();
+    });
+
+    document.getElementById('undoBtn').addEventListener('click', () => {
+      const last = undoStack.pop();
+      if (!last) return;
+      // Support undo for either task or history changes
+      if (Array.isArray(last)) {
+        tasks = last; save(STORAGE_TASKS, tasks); renderTasks();
+      } else if (last && last.history) {
+        history = last.history; tasks = last.tasks || tasks; save(STORAGE_HISTORY, history); save(STORAGE_TASKS, tasks); renderHistory(); renderTasks();
+      }
+    });
+
+    // Initial paint
+    renderTasks();
+    renderHistory();
+  </script>
 </body>
 </html>
