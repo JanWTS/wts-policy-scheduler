@@ -29,6 +29,10 @@ let actionHistory = [];
 // original task object is deep-copied here so that it can be restored
 // if the user chooses to undo the edit.  Cleared on finish.
 let editingBackup = null;
+// Track which completed-task history row is currently being edited.
+let editingHistoryIndex = null;
+// Backup of the completed history record prior to editing.
+let historyEditBackup = null;
 
 /**
  * Compute the next due date for a task based on its periodicity.
@@ -182,39 +186,190 @@ function completeTask(idx) {
 function buildCompletedTable() {
   const table = document.getElementById('completed-table');
   if (!table) return;
-  // Clear table
   table.innerHTML = '';
-  // Build header
+  const columns = ['Policy','Task','Due Date','Completed By','Verified By','Completed Date','Actions'];
   const thead = document.createElement('thead');
   const hr = document.createElement('tr');
-  ['Policy','Task','Due Date','Completed By','Verified By','Completed Date'].forEach(text => {
+  columns.forEach(text => {
     const th = document.createElement('th');
     th.textContent = text;
     hr.appendChild(th);
   });
   thead.appendChild(hr);
   table.appendChild(thead);
-  // Fetch search filter
   const searchInput = document.getElementById('completed-search');
   const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
-  // Sort completed tasks by completed_date descending
   const sorted = [...completedTasks].sort((a, b) => {
     return b.completed_date.localeCompare(a.completed_date);
   });
-  // Build body
   const tbody = document.createElement('tbody');
   sorted.forEach(rec => {
     const combined = `${rec.policy} ${rec.task} ${rec.due_date} ${rec.completed_by} ${rec.verified_by} ${rec.completed_date}`.toLowerCase();
     if (query && !combined.includes(query)) return;
+    const originalIndex = completedTasks.indexOf(rec);
+    if (originalIndex === -1) return;
+    const isEditing = editingHistoryIndex === originalIndex;
     const tr = document.createElement('tr');
-    [rec.policy, rec.task, rec.due_date, rec.completed_by, rec.verified_by, rec.completed_date].forEach(val => {
+    const fields = [
+      { key: 'policy', type: 'text' },
+      { key: 'task', type: 'text' },
+      { key: 'due_date', type: 'date' },
+      { key: 'completed_by', type: 'text' },
+      { key: 'verified_by', type: 'text' },
+      { key: 'completed_date', type: 'date' }
+    ];
+    fields.forEach(field => {
       const td = document.createElement('td');
-      td.textContent = val || '';
+      const value = rec[field.key] || '';
+      if (isEditing) {
+        const input = document.createElement('input');
+        input.type = field.type;
+        input.value = value;
+        input.dataset.field = field.key;
+        td.appendChild(input);
+      } else {
+        td.textContent = value;
+      }
       tr.appendChild(td);
     });
+    const actionTd = document.createElement('td');
+    if (isEditing) {
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = 'Save';
+      saveBtn.addEventListener('click', (e) => {
+        const rowEl = e.currentTarget.closest('tr');
+        if (!rowEl) return;
+        const inputs = rowEl.querySelectorAll('input[data-field]');
+        const updates = {};
+        inputs.forEach(inp => {
+          updates[inp.dataset.field] = inp.value.trim();
+        });
+        saveHistoryEdit(originalIndex, updates);
+      });
+      actionTd.appendChild(saveBtn);
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.style.marginLeft = '0.3rem';
+      cancelBtn.addEventListener('click', () => {
+        cancelHistoryEdit();
+      });
+      actionTd.appendChild(cancelBtn);
+    } else {
+      const editBtn = document.createElement('button');
+      editBtn.textContent = 'Edit';
+      editBtn.addEventListener('click', () => {
+        startEditHistory(originalIndex);
+      });
+      actionTd.appendChild(editBtn);
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.style.marginLeft = '0.3rem';
+      deleteBtn.addEventListener('click', () => {
+        deleteHistoryRecord(originalIndex);
+      });
+      actionTd.appendChild(deleteBtn);
+    }
+    tr.appendChild(actionTd);
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
+}
+
+/**
+ * Start editing a completed-history record.
+ *
+ * @param {number} index Index of the record in completedTasks
+ */
+function startEditHistory(index) {
+  if (typeof index !== 'number' || index < 0 || index >= completedTasks.length) return;
+  historyEditBackup = JSON.parse(JSON.stringify(completedTasks[index]));
+  editingHistoryIndex = index;
+  buildCompletedTable();
+}
+
+/**
+ * Cancel editing for the completed-history table.
+ */
+function cancelHistoryEdit() {
+  editingHistoryIndex = null;
+  historyEditBackup = null;
+  buildCompletedTable();
+}
+
+/**
+ * Persist edits to a completed-history record, record the change for undo,
+ * and refresh dependent UI (calendar/list/table).
+ *
+ * @param {number} index Index of the record in completedTasks
+ * @param {Object} updates Map of field -> new value from the edit form
+ */
+function saveHistoryEdit(index, updates) {
+  if (typeof index !== 'number' || index < 0 || index >= completedTasks.length) return;
+  const record = completedTasks[index];
+  const previous = historyEditBackup
+    ? JSON.parse(JSON.stringify(historyEditBackup))
+    : JSON.parse(JSON.stringify(record));
+  const cleaned = { ...record };
+  ['policy','task','due_date','completed_by','verified_by','completed_date'].forEach(field => {
+    if (Object.prototype.hasOwnProperty.call(updates, field)) {
+      cleaned[field] = updates[field] || '';
+    }
+  });
+  completedTasks[index] = cleaned;
+  actionHistory.push({ type: 'editHistory', index, previousRecord: previous });
+  editingHistoryIndex = null;
+  historyEditBackup = null;
+  try {
+    localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
+  } catch (e) {}
+  buildCompletedTable();
+  renderCalendar(tasksData);
+  buildTaskList(tasksData);
+}
+
+/**
+ * Remove a completed-history record.  If this was the most recent completion
+ * for the associated task, restore its due date so the calendar/list show it
+ * as pending again.
+ *
+ * @param {number} index Index of the record in completedTasks
+ */
+function deleteHistoryRecord(index) {
+  if (typeof index !== 'number' || index < 0 || index >= completedTasks.length) return;
+  const confirmDelete = window.confirm('Remove this entry from history? This will mark the occurrence as not completed.');
+  if (!confirmDelete) return;
+  const record = completedTasks[index];
+  const removedRecord = JSON.parse(JSON.stringify(record));
+  const task = tasksData[record.index];
+  let dueDateWasUpdated = false;
+  let previousDueDate = '';
+  const hasLaterCompletion = completedTasks.some((rec, idx) => {
+    return idx !== index && rec.index === record.index && rec.due_date > record.due_date;
+  });
+  if (task && !hasLaterCompletion) {
+    dueDateWasUpdated = true;
+    previousDueDate = task.due_date || '';
+    task.due_date = record.due_date;
+    try {
+      localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
+    } catch (e) {}
+  }
+  completedTasks.splice(index, 1);
+  actionHistory.push({
+    type: 'deleteHistory',
+    record: removedRecord,
+    insertIndex: index,
+    dueDateWasUpdated,
+    previousDueDate
+  });
+  editingHistoryIndex = null;
+  historyEditBackup = null;
+  try {
+    localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
+  } catch (e) {}
+  buildCompletedTable();
+  renderCalendar(tasksData);
+  buildTaskList(tasksData);
 }
 
 /**
@@ -1381,12 +1536,29 @@ function undoLastAction() {
         localStorage.setItem('taskStatus', JSON.stringify(saved));
       } catch (e) {}
       break;
+    case 'editHistory':
+      if (typeof action.index === 'number' && action.previousRecord) {
+        completedTasks[action.index] = action.previousRecord;
+      }
+      break;
+    case 'deleteHistory':
+      if (action.record) {
+        const insertIdx = typeof action.insertIndex === 'number' ? action.insertIndex : completedTasks.length;
+        completedTasks.splice(insertIdx, 0, action.record);
+        if (action.dueDateWasUpdated && typeof action.record.index === 'number' && tasksData[action.record.index]) {
+          tasksData[action.record.index].due_date = action.previousDueDate || '';
+        }
+      }
+      break;
     default:
       break;
   }
   // Persist updated tasks
   try {
     localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
+  } catch (e) {}
+  try {
+    localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
   } catch (e) {}
   // Refresh UI to reflect undo
   buildTaskList(tasksData);
