@@ -29,6 +29,102 @@ let actionHistory = [];
 // original task object is deep-copied here so that it can be restored
 // if the user chooses to undo the edit.  Cleared on finish.
 let editingBackup = null;
+// Working copy of the row currently being edited.  Changes stay here until
+// the user clicks Finish.
+let editingDraft = null;
+// Indicates whether the current editing session is for a newly added task.
+let editingIsNewTask = false;
+
+/**
+ * Normalize the saved status structure so subsequent operations can safely
+ * splice without worrying whether saved is an object or array.
+ */
+function normalizeSavedStructure() {
+  if (Array.isArray(saved)) return;
+  const arr = [];
+  if (saved && typeof saved === 'object') {
+    Object.keys(saved).forEach((key) => {
+      const idx = parseInt(key, 10);
+      if (!Number.isNaN(idx)) {
+        arr[idx] = saved[key];
+      }
+    });
+  }
+  saved = arr;
+}
+
+function persistSavedState() {
+  try {
+    localStorage.setItem('taskStatus', JSON.stringify(saved));
+  } catch (e) {}
+}
+
+function cloneSavedEntry(index) {
+  normalizeSavedStructure();
+  const entry = saved[index];
+  if (!entry) return null;
+  return {
+    completed_by: entry.completed_by || '',
+    verified_by: entry.verified_by || ''
+  };
+}
+
+function removeSavedEntry(index) {
+  normalizeSavedStructure();
+  saved.splice(index, 1);
+  persistSavedState();
+}
+
+function insertSavedEntry(index, entry) {
+  normalizeSavedStructure();
+  if (typeof index !== 'number' || index < 0) return;
+  const payload = entry ? {
+    completed_by: entry.completed_by || '',
+    verified_by: entry.verified_by || ''
+  } : null;
+  saved.splice(index, 0, payload);
+  persistSavedState();
+}
+
+function ensureOverrideArray(task) {
+  if (!task) return [];
+  if (!Array.isArray(task.occurrenceOverrides)) {
+    task.occurrenceOverrides = [];
+  }
+  return task.occurrenceOverrides;
+}
+
+/**
+ * Ensure a draft object exists for the specified row index.
+ *
+ * @param {number} index Task index
+ * @returns {Object|null} Editing draft
+ */
+function ensureEditingDraft(index) {
+  if (editingRowIndex !== index) return editingDraft;
+  if (!editingDraft) {
+    editingDraft = JSON.parse(JSON.stringify(tasksData[index] || {}));
+  }
+  return editingDraft;
+}
+
+/**
+ * Update a field on the editing draft for the specified row.
+ *
+ * @param {number} index Task index being edited
+ * @param {string} field Field name to update
+ * @param {*} value New value
+ */
+function setDraftField(index, field, value) {
+  if (editingRowIndex !== index) return;
+  const draft = ensureEditingDraft(index);
+  if (draft) {
+    draft[field] = value;
+    if (field === 'due_date' && (editingIsNewTask || !draft.initial_due_date)) {
+      draft.initial_due_date = value;
+    }
+  }
+}
 // Track which completed-task history row is currently being edited.
 let editingHistoryIndex = null;
 // Backup of the completed history record prior to editing.
@@ -82,12 +178,32 @@ function getNextDueDate(dateStr, periodicity) {
 function generateOccurrences(task, start, end) {
   const occurrences = [];
   if (!task.initial_due_date) return occurrences;
+  const overrides = Array.isArray(task.occurrenceOverrides) ? task.occurrenceOverrides : [];
+  const overrideMap = {};
+  overrides.forEach((entry) => {
+    if (entry && entry.fromDate && entry.toDate) {
+      overrideMap[entry.fromDate] = entry.toDate;
+    }
+  });
+  const skipDates = new Set(Object.keys(overrideMap));
   const first = new Date(task.initial_due_date + 'T00:00:00');
   // Handle tasks that do not repeat
   if (task.periodicity === 'OTHER' || !getNextDueDate(task.initial_due_date, task.periodicity)) {
-    if (first >= start && first <= end) {
-      occurrences.push(first);
+    const baseDateStr = (task.due_date || task.initial_due_date || '').toString();
+    if (baseDateStr) {
+      const baseDate = new Date(baseDateStr + 'T00:00:00');
+      const baseKey = baseDate.toISOString().slice(0, 10);
+      if (!skipDates.has(baseKey) && baseDate >= start && baseDate <= end) {
+        occurrences.push(baseDate);
+      }
     }
+    Object.values(overrideMap).forEach((newDateStr) => {
+      if (!newDateStr) return;
+      const overrideDate = new Date(newDateStr + 'T00:00:00');
+      if (overrideDate >= start && overrideDate <= end) {
+        occurrences.push(overrideDate);
+      }
+    });
     return occurrences;
   }
   // Advance to the first occurrence on or after the start date
@@ -99,11 +215,22 @@ function generateOccurrences(task, start, end) {
   }
   // Add occurrences within the range
   while (current <= end) {
-    occurrences.push(new Date(current));
+    const key = current.toISOString().slice(0, 10);
+    if (!skipDates.has(key)) {
+      occurrences.push(new Date(current));
+    }
     const nextStr = getNextDueDate(current.toISOString().slice(0, 10), task.periodicity);
     if (!nextStr) break;
     current = new Date(nextStr + 'T00:00:00');
   }
+  // Add override occurrences that fall within the range
+  Object.values(overrideMap).forEach((newDateStr) => {
+    if (!newDateStr) return;
+    const overrideDate = new Date(newDateStr + 'T00:00:00');
+    if (overrideDate >= start && overrideDate <= end) {
+      occurrences.push(overrideDate);
+    }
+  });
   return occurrences;
 }
 
@@ -130,6 +257,7 @@ function completeTask(idx) {
   const task = tasksData[idx];
   const dueDate = task.due_date;
   if (!dueDate) return;
+  normalizeSavedStructure();
   // Capture names from saved status if available
   const compName = saved[idx] ? saved[idx].completed_by || '' : '';
   const verName = saved[idx] ? saved[idx].verified_by || '' : '';
@@ -155,13 +283,32 @@ function completeTask(idx) {
     completed_by: saved[idx].completed_by || '',
     verified_by: saved[idx].verified_by || ''
   } : { completed_by: '', verified_by: '' };
-  // Record the completion action along with previous due date and saved names for undo
-  actionHistory.push({ type: 'complete', index: idx, previousDueDate: dueDate, previousSaved: prevSaved });
+  // Remove any one-off override associated with this occurrence so future cycles
+  // revert back to the default schedule.
+  const taskOverrides = Array.isArray(task.occurrenceOverrides) ? task.occurrenceOverrides : [];
+  const removedOverrides = [];
+  if (taskOverrides.length > 0) {
+    for (let i = taskOverrides.length - 1; i >= 0; i--) {
+      const entry = taskOverrides[i];
+      if (entry && (entry.toDate === dueDate || entry.fromDate === dueDate)) {
+        removedOverrides.push(entry);
+        taskOverrides.splice(i, 1);
+      }
+    }
+    task.occurrenceOverrides = taskOverrides;
+  }
+  // Record the completion action along with previous due date, saved names, and overrides for undo
+  actionHistory.push({
+    type: 'complete',
+    index: idx,
+    previousDueDate: dueDate,
+    previousSaved: prevSaved,
+    removedOverrides
+  });
   // Clear the saved names for the next occurrence so the new task is not marked as completed
+  normalizeSavedStructure();
   saved[idx] = { completed_by: '', verified_by: '' };
-  try {
-    localStorage.setItem('taskStatus', JSON.stringify(saved));
-  } catch (e) {}
+  persistSavedState();
   // Update the task's due_date to the next occurrence (or clear for non-recurring tasks)
   if (next) {
     tasksData[idx].due_date = next;
@@ -405,7 +552,7 @@ function showCompletedView() {
 // with a `name` property and an `assets` array listing the assets (by
 // inventoryId and itemName) assigned to that person.
 const inventoryData = [{"inventoryId": "Office", "serialNumber": "LINIQ8WZ4314480", "itemName": "Vizio V-Series 50\"", "itemDescription": " 4K UHD HDR LED Smart TV", "quantity": 1.0, "itemPrice": 269.99, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Office2", "serialNumber": "LINIQ8WZ4313635", "itemName": "Vizio V-Series 50\"", "itemDescription": "4K UHD HDR LED Smart TV", "quantity": 1.0, "itemPrice": 269.99, "location": "Office Room 3", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Office Printer", "serialNumber": "CVBRR2N4DM", "itemName": "HP ColorJet Pro MFP4301", "itemDescription": "Color Printer", "quantity": 1.0, "itemPrice": 699.99, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 1", "serialNumber": "3CM3240BXC", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "WorkSpace04", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 2", "serialNumber": "3CM328198F", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "WorkSpace04", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 3", "serialNumber": "3CM3460JSG", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 4", "serialNumber": "3CM3460JS6", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 5", "serialNumber": "3CM3460JSH", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "WorkSpace04", "issuedTo": "Ken Stein", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 6", "serialNumber": "3CM3460JTD", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 1", "issuedTo": "Ken Stein", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 7", "serialNumber": "3CM3460JS4", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Jan Miketa", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 8", "serialNumber": "3CM3460JSD", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Jan Miketa", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 9", "serialNumber": "3CM3460JS7", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Becky Sowell", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 10", "serialNumber": "3CM3460JSJ", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Becky Sowell", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 11", "serialNumber": "3CM4200JJY", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Carole Zehner", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 12", "serialNumber": "3CM4150HYY", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 3", "issuedTo": "Carole Zehner", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 13", "serialNumber": "3CM4236RRG", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 2", "issuedTo": "Jackie Chrabot", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 14", "serialNumber": "3CM4230RRW", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Office Room 2", "issuedTo": "Jackie Chrabot", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 15", "serialNumber": "3CM42913TX", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS Monitor 16", "serialNumber": "3CM42914HZ", "itemName": "HP M22f FHD Monitor", "itemDescription": "Desktop Monitors", "quantity": 1.0, "itemPrice": 144.99, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS LT-0001", "serialNumber": "HS6H1Z3", "itemName": "DELL VOSTRO 15 LAPTOP", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 849.0, "location": "Jacob Gonzales", "issuedTo": "Jacob Gonzales", "issuedDate": "Nov. 2025", "notes": ""}, {"inventoryId": "WTS LT-0002", "serialNumber": "6TM61Z3", "itemName": "DELL VOSTRO 15 LAPTOP 3530", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 849.0, "location": "Office Room 3", "issuedTo": "Carole Zehner", "issuedDate": "Sep. 2025", "notes": ""}, {"inventoryId": "WTS LT-0003", "serialNumber": "3ZKH1Z3", "itemName": "DELL VOSTRO 15 LAPTOP 3530", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 849.0, "location": "Office Room 3", "issuedTo": "Becky Sowell", "issuedDate": "Sep. 2024", "notes": ""}, {"inventoryId": "WTS LT-0004", "serialNumber": "G9RH1Z3", "itemName": "DELL VOSTRO 15 LAPTOP 3530", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 849.0, "location": "Office Room 1", "issuedTo": "Ken Stein", "issuedDate": "Jan. 2024", "notes": ""}, {"inventoryId": "WTS LT-0005", "serialNumber": "5CG93373QP", "itemName": "HP ELITEBOOK 840 G5", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 674.99, "location": "Assigned to Jacqueline", "issuedTo": "Jackie Chrabot", "issuedDate": "Mar. 2025", "notes": ""}, {"inventoryId": "WTS LT-0006", "serialNumber": "TA850612", "itemName": "HP ELITEBOOK 840 G5", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 674.99, "location": "(RETIRED/BROKEN)", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS LT-0007", "serialNumber": "5CG9112HB5", "itemName": "HP ELITEBOOK 840 G6", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 674.99, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS LT-0008", "serialNumber": "A131ZJUA#ABA", "itemName": "HP OMNIBOOK 14", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 1499.99, "location": "Assigned to Tom", "issuedTo": "Tom Crain", "issuedDate": "Jun. 2024", "notes": ""}, {"inventoryId": "WTS LT-0009", "serialNumber": "ST: F7RH1Z3", "itemName": "DELL VOSTRO 15 LAPTOP 3530", "itemDescription": "Laptop ", "quantity": 1.0, "itemPrice": 849.0, "location": "Office Room 3", "issuedTo": "Jan Miketa", "issuedDate": "", "notes": ""}, {"inventoryId": "OfficeDesk1 ", "serialNumber": "8QSTAD", "itemName": "HON Executive Desk  H10712L.JJ", "itemDescription": "Office desk (L-shape) Bowfront", "quantity": 1.0, "itemPrice": 499.99, "location": "WorkSpace04", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "OfficeDesk2", "serialNumber": "C7U52A( LEFTSIDE) CUU5EA (RIGHTSIDE)", "itemName": "HON Executive Desk 101064 JJ", "itemDescription": "Office desk (L-shape)", "quantity": 1.0, "itemPrice": 499.99, "location": "Unassigned", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "OfficeDesk3", "serialNumber": "86STAD", "itemName": "HON Executive Desk H10712L.JJ", "itemDescription": "Office desk (L-shape)", "quantity": 1.0, "itemPrice": 499.99, "location": "Unassigned", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "OfficeDesk4", "serialNumber": "CKU52A (LEFTSIDE) CRU5EA (RIGHTSIDE)", "itemName": "HON Executive Desk 101064 JJ", "itemDescription": "Office desk (L-shape)", "quantity": 1.0, "itemPrice": 499.99, "location": "Office Room 2", "issuedTo": "Jackie Chrabot", "issuedDate": "", "notes": ""}, {"inventoryId": "Micro01", "serialNumber": "T230730040990", "itemName": "Cuisinart Microwave Oven", "itemDescription": "Office Microwave", "quantity": 1.0, "itemPrice": 109.99, "location": "Breakroom Kitchen", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS1 Phone", "serialNumber": "FVH27040", "itemName": "Cisco IP Phone 8851", "itemDescription": "Desk Phone", "quantity": 1.0, "itemPrice": 350.0, "location": "Office Room 4", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS2 Phone", "serialNumber": "FVH27040J2P", "itemName": "Cisco IP Phone 8851", "itemDescription": "Desk Phone", "quantity": 1.0, "itemPrice": 350.0, "location": "Cyber Room", "issuedTo": "(UNASSIGNED)", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS3 Phone", "serialNumber": "FVH27040FPQ", "itemName": "Cisco IP Phone 8851", "itemDescription": "Desk Phone", "quantity": 1.0, "itemPrice": 350.0, "location": "Office Room 1", "issuedTo": "Ken Stein", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS4 Phone", "serialNumber": "FVH27040K0H", "itemName": "Cisco IP Phone 8851", "itemDescription": "Desk Phone", "quantity": 1.0, "itemPrice": 350.0, "location": "Unassigned", "issuedTo": "Retrieving data. Wait a few seconds and try to cut or copy again.", "issuedDate": "", "notes": ""}, {"inventoryId": "WTS5 Phone", "serialNumber": "FVH27040N3H", "itemName": "Cisco IP Phone 8851", "itemDescription": "Desk Phone", "quantity": 1.0, "itemPrice": 350.0, "location": "Office Room 3", "issuedTo": "Retrieving data. Wait a few seconds and try to cut or copy again.", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC01", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC02", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC03", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC04", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC05", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC06", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC07", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLKFC08", "serialNumber": "", "itemName": "Haworth Zody Multifunction Task Chair Black", "itemDescription": "BLACK Office Chair", "quantity": 1.0, "itemPrice": 229.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC01", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC02", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC03", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC04", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC05", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC06", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC07", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BLUFC08", "serialNumber": "", "itemName": "Global Granada Multi-Function Task Chair", "itemDescription": "BLUE Office chair", "quantity": 1.0, "itemPrice": 129.99, "location": "Office space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "BAC01", "serialNumber": "", "itemName": "Sit On It Guest Arm Chair Blue", "itemDescription": "Arm Chair", "quantity": 1.0, "itemPrice": 79.99, "location": "WorkSpace04", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "BAC02", "serialNumber": "", "itemName": "Sit On It Guest Arm Chair Blue", "itemDescription": "Arm Chair", "quantity": 1.0, "itemPrice": 79.99, "location": "WorkSpace04", "issuedTo": "Steve Dutter", "issuedDate": "", "notes": ""}, {"inventoryId": "RT01", "serialNumber": "", "itemName": "Office sourse 36\" Round discussion Table", "itemDescription": "lounge table (round)", "quantity": 1.0, "itemPrice": 149.99, "location": "Employee Breakroom", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 1", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace03", "issuedTo": "  ", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 2", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace03", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 3", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace03", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 4", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace03", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 5", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 6", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 7", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 8", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace01", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Cube 9", "serialNumber": "", "itemName": "Cubicle ", "itemDescription": "Workstation", "quantity": 1.0, "itemPrice": 800.0, "location": "WorkSpace01", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "REFER01", "serialNumber": "", "itemName": "Whirlpool", "itemDescription": "Refridgerator", "quantity": 1.0, "itemPrice": 159.99, "location": "Employee Breakroom", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "SHREDDER01", "serialNumber": 24040100058, "itemName": "Kitnery", "itemDescription": "CUI Shredder", "quantity": 1.0, "itemPrice": 369.0, "location": "Common Area", "issuedTo": "", "issuedDate": "", "notes": "kitnery.us@outlook.com"}, {"inventoryId": "Trash Can 1", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 2", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Kitchen Breakroom", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 3 ", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 4 ", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 5", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 6", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Trash Can 7", "serialNumber": "", "itemName": "Highmark", "itemDescription": "Trash Can", "quantity": 1.0, "itemPrice": 14.99, "location": "Office Space", "issuedTo": "", "issuedDate": "", "notes": ""}, {"inventoryId": "Teleconference Puck", "serialNumber": "EERXK9", "itemName": "Poly Sync", "itemDescription": "Teleconference Puck", "quantity": 1.0, "itemPrice": 139.99, "location": "Assigned to Tom", "issuedTo": "Tom Crain", "issuedDate": "", "notes": ""}, {"inventoryId": "SW001", "serialNumber": "", "itemName": "MSI", "itemDescription": "Dev Laptop ", "quantity": "", "itemPrice": "", "location": "Office Room 3", "issuedTo": "Jan Miketa", "issuedDate": "", "notes": ""}];
-const membersData = [{"name": "Steve Dutter", "assets": [{"inventoryId": "WTS Monitor 1", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 2", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "OfficeDesk1 ", "itemName": "HON Executive Desk  H10712L.JJ"}, {"inventoryId": "WTS1 Phone", "itemName": "Cisco IP Phone 8851"}, {"inventoryId": "BLKFC01", "itemName": "Haworth Zody Multifunction Task Chair Black"}, {"inventoryId": "BAC01", "itemName": "Sit On It Guest Arm Chair Blue"}, {"inventoryId": "BAC02", "itemName": "Sit On It Guest Arm Chair Blue"}]}, {"name": "Ken Stein", "assets": [{"inventoryId": "WTS Monitor 5", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 6", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0004", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}, {"inventoryId": "WTS3 Phone", "itemName": "Cisco IP Phone 8851"}, {"inventoryId": "BLKFC02", "itemName": "Haworth Zody Multifunction Task Chair Black"}]}, {"name": "Jan Miketa", "assets": [{"inventoryId": "WTS Monitor 7", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 8", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0009", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}, {"inventoryId": "SW001", "itemName": "MSI"}]}, {"name": "Becky Sowell", "assets": [{"inventoryId": "WTS Monitor 9", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 10", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0003", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}]}, {"name": "Carole Zehner", "assets": [{"inventoryId": "WTS Monitor 11", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 12", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0002", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}]}, {"name": "Jackie Chrabot", "assets": [{"inventoryId": "WTS Monitor 13", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 14", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0005", "itemName": "HP ELITEBOOK 840 G5"}, {"inventoryId": "OfficeDesk4", "itemName": "HON Executive Desk 101064 JJ"}]}, {"name": "Jacob Gonzales", "assets": [{"inventoryId": "WTS LT-0001", "itemName": "DELL VOSTRO 15 LAPTOP"}]}, {"name": "Tom Crain", "assets": [{"inventoryId": "WTS LT-0008", "itemName": "HP OMNIBOOK 14"}, {"inventoryId": "Teleconference Puck", "itemName": "Poly Sync"}]}, {"name": "Retrieving data. Wait a few seconds and try to cut or copy again.", "assets": [{"inventoryId": "WTS4 Phone", "itemName": "Cisco IP Phone 8851"}, {"inventoryId": "WTS5 Phone", "itemName": "Cisco IP Phone 8851"}]}];
+const membersData = [{"name": "Steve Dutter", "assets": [{"inventoryId": "WTS Monitor 1", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 2", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "OfficeDesk1 ", "itemName": "HON Executive Desk  H10712L.JJ"}, {"inventoryId": "WTS1 Phone", "itemName": "Cisco IP Phone 8851"}, {"inventoryId": "BLKFC01", "itemName": "Haworth Zody Multifunction Task Chair Black"}, {"inventoryId": "BAC01", "itemName": "Sit On It Guest Arm Chair Blue"}, {"inventoryId": "BAC02", "itemName": "Sit On It Guest Arm Chair Blue"}]}, {"name": "Ken Stein", "assets": [{"inventoryId": "WTS Monitor 5", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 6", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0004", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}, {"inventoryId": "WTS3 Phone", "itemName": "Cisco IP Phone 8851"}, {"inventoryId": "BLKFC02", "itemName": "Haworth Zody Multifunction Task Chair Black"}]}, {"name": "Jan Miketa", "assets": [{"inventoryId": "WTS Monitor 7", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 8", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0009", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}, {"inventoryId": "SW001", "itemName": "MSI"}]}, {"name": "Becky Sowell", "assets": [{"inventoryId": "WTS Monitor 9", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 10", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0003", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}]}, {"name": "Carole Zehner", "assets": [{"inventoryId": "WTS Monitor 11", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 12", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0002", "itemName": "DELL VOSTRO 15 LAPTOP 3530"}]}, {"name": "Jackie Chrabot", "assets": [{"inventoryId": "WTS Monitor 13", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS Monitor 14", "itemName": "HP M22f FHD Monitor"}, {"inventoryId": "WTS LT-0005", "itemName": "HP ELITEBOOK 840 G5"}, {"inventoryId": "OfficeDesk4", "itemName": "HON Executive Desk 101064 JJ"}]}, {"name": "Jacob Gonzales", "assets": [{"inventoryId": "WTS LT-0001", "itemName": "DELL VOSTRO 15 LAPTOP"}]}, {"name": "Tom Crain", "assets": [{"inventoryId": "WTS LT-0008", "itemName": "HP OMNIBOOK 14"}, {"inventoryId": "Teleconference Puck", "itemName": "Poly Sync"}]}];
 
 /**
  * Load inventory and members data from JSON files.  The data files are
@@ -453,6 +600,7 @@ function initializeApp(tasksData) {
   } catch (e) {
     saved = {};
   }
+  normalizeSavedStructure();
   // Restore completed tasks from localStorage
   try {
     completedTasks = JSON.parse(localStorage.getItem('completedTasks')) || [];
@@ -467,6 +615,7 @@ function initializeApp(tasksData) {
     if (task.periodicity) {
       task.periodicity = task.periodicity.toString().toUpperCase();
     }
+    ensureOverrideArray(task);
   });
   // Build the task list and store row elements for quick access
   buildTaskList(tasksData);
@@ -589,9 +738,10 @@ function buildTaskList(tasksData) {
   const tbody = document.querySelector('#task-table tbody');
   tbody.innerHTML = '';
   rowElements = [];
+  normalizeSavedStructure();
   tasksData.forEach((task, idx) => {
-    // Skip tasks that no longer have a due date (e.g. one‑time tasks after completion)
-    if (!task.due_date) {
+    // Skip tasks that no longer have a due date (e.g. one-time tasks after completion)
+    if (!task.due_date && editingRowIndex !== idx) {
       rowElements[idx] = null;
       return;
     }
@@ -605,18 +755,19 @@ function buildTaskList(tasksData) {
     row.appendChild(idxTd);
     // Determine if this row is currently being edited
     const isEditing = editingRowIndex === idx;
+    const rowData = isEditing && editingDraft ? editingDraft : task;
     // Policy
     const policyTd = document.createElement('td');
     if (isEditing) {
       const inp = document.createElement('input');
       inp.type = 'text';
-      inp.value = task.policy;
+      inp.value = rowData.policy || '';
       inp.addEventListener('input', (e) => {
-        tasksData[idx].policy = e.target.value;
+        setDraftField(idx, 'policy', e.target.value);
       });
       policyTd.appendChild(inp);
     } else {
-      policyTd.textContent = task.policy;
+      policyTd.textContent = rowData.policy || '';
     }
     row.appendChild(policyTd);
     // Title (task name) column
@@ -624,13 +775,13 @@ function buildTaskList(tasksData) {
     if (isEditing) {
       const inp = document.createElement('input');
       inp.type = 'text';
-      inp.value = task.task || '';
+      inp.value = rowData.task || '';
       inp.addEventListener('input', (e) => {
-        tasksData[idx].task = e.target.value;
+        setDraftField(idx, 'task', e.target.value);
       });
       titleTd.appendChild(inp);
     } else {
-      titleTd.textContent = task.task || '';
+      titleTd.textContent = rowData.task || '';
     }
     row.appendChild(titleTd);
 
@@ -639,13 +790,13 @@ function buildTaskList(tasksData) {
     if (isEditing) {
       const inp = document.createElement('input');
       inp.type = 'text';
-      inp.value = task.description || '';
+      inp.value = rowData.description || '';
       inp.addEventListener('input', (e) => {
-        tasksData[idx].description = e.target.value;
+        setDraftField(idx, 'description', e.target.value);
       });
       descTd.appendChild(inp);
     } else {
-      descTd.textContent = task.description || '';
+      descTd.textContent = rowData.description || '';
     }
     row.appendChild(descTd);
     // Periodicity
@@ -657,17 +808,15 @@ function buildTaskList(tasksData) {
         const option = document.createElement('option');
         option.value = opt;
         option.textContent = opt;
-        if (task.periodicity === opt) option.selected = true;
+        if (rowData.periodicity === opt) option.selected = true;
         sel.appendChild(option);
       });
       sel.addEventListener('change', (e) => {
-        tasksData[idx].periodicity = e.target.value;
-        // Update calendar after editing periodicity
-        renderCalendar(tasksData);
+        setDraftField(idx, 'periodicity', e.target.value);
       });
       perTd.appendChild(sel);
     } else {
-      perTd.textContent = task.periodicity;
+      perTd.textContent = rowData.periodicity || '';
     }
     row.appendChild(perTd);
     // Due date
@@ -675,14 +824,16 @@ function buildTaskList(tasksData) {
     if (isEditing) {
       const inp = document.createElement('input');
       inp.type = 'date';
-      inp.value = task.due_date;
+      inp.value = rowData.due_date || '';
+      let lastDueDate = rowData.due_date || '';
       inp.addEventListener('change', (e) => {
-        tasksData[idx].due_date = e.target.value;
-        renderCalendar(tasksData);
+        const newValue = e.target.value;
+        handleDueDateChange(idx, lastDueDate, newValue, rowData.periodicity || task.periodicity);
+        lastDueDate = newValue;
       });
       dueTd.appendChild(inp);
     } else {
-      dueTd.textContent = task.due_date;
+      dueTd.textContent = rowData.due_date || '';
     }
     row.appendChild(dueTd);
     // Completed By input
@@ -720,18 +871,25 @@ function buildTaskList(tasksData) {
       actionTd.appendChild(finishBtn);
       // Add delete button next to finish when editing
       const deleteBtn = document.createElement('button');
-      deleteBtn.innerHTML = '&#128465;'; // trashcan icon
+      deleteBtn.innerHTML = '&#128465; Delete';
+      deleteBtn.classList.add('delete-btn');
       deleteBtn.style.marginLeft = '0.3rem';
       deleteBtn.addEventListener('click', () => {
         // Show confirmation before deleting
         const confirmDelete = window.confirm('Are you sure you want to delete this entry?');
         if (confirmDelete) {
           // Record delete action with a copy of the task and its index
-          const removedTask = JSON.parse(JSON.stringify(tasksData[idx]));
-          actionHistory.push({ type: 'deleteTask', index: idx, task: removedTask });
+          const sourceTask = (editingRowIndex === idx && editingDraft) ? editingDraft : tasksData[idx];
+          const removedTask = JSON.parse(JSON.stringify(sourceTask));
+          const removedSaved = cloneSavedEntry(idx);
+          actionHistory.push({ type: 'deleteTask', index: idx, task: removedTask, savedSnapshot: removedSaved });
           // Remove the task from the array
           tasksData.splice(idx, 1);
           editingRowIndex = null;
+          editingDraft = null;
+          editingBackup = null;
+          editingIsNewTask = false;
+          removeSavedEntry(idx);
           // Persist changes to persistent storage
           try {
             localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
@@ -774,9 +932,9 @@ function buildTaskList(tasksData) {
     // to classify it as overdue (red), due today (yellow) or pending
     // (light blue).
     row.classList.remove('row-completed','row-overdue','row-due-today','row-pending');
-    if (task.due_date) {
+    if (rowData.due_date) {
       const todayStr = new Date().toISOString().slice(0, 10);
-      const dueDateStr = task.due_date;
+      const dueDateStr = rowData.due_date;
       let status = 'pending';
       // Check completedTasks records
       if (isTaskCompleted(idx, dueDateStr)) {
@@ -815,6 +973,58 @@ function applyFilter() {
 }
 
 /**
+ * Handle due date edits by prompting the user whether to apply the change to
+ * the entire series or just the current occurrence.
+ *
+ * @param {number} index Task index being edited
+ * @param {string} oldDate Previous due date
+ * @param {string} newDate New due date from the input
+ * @param {string} periodicity Task periodicity
+ */
+function handleDueDateChange(index, oldDate, newDate, periodicity) {
+  if (editingRowIndex !== index) return;
+  const draft = ensureEditingDraft(index);
+  if (!draft) return;
+  if (!newDate) {
+    setDraftField(index, 'due_date', '');
+    return;
+  }
+  const isRecurring = periodicity && periodicity !== 'OTHER';
+  let applyAll = true;
+  if (isRecurring && oldDate) {
+    applyAll = window.confirm('Apply this date to every occurrence in the series? Click OK for the full series, or Cancel to update only this single occurrence.');
+  }
+  if (applyAll) {
+    setDraftField(index, 'due_date', newDate);
+    setDraftField(index, 'initial_due_date', newDate);
+    if (draft.occurrenceOverrides && draft.occurrenceOverrides.length) {
+      draft.occurrenceOverrides = draft.occurrenceOverrides.filter(entry => entry && entry.fromDate !== oldDate && entry.toDate !== oldDate);
+    }
+  } else {
+    if (!oldDate) {
+      setDraftField(index, 'due_date', newDate);
+      return;
+    }
+    setDraftField(index, 'due_date', newDate);
+    const overrides = ensureOverrideArray(draft);
+    let updated = false;
+    for (let i = overrides.length - 1; i >= 0; i--) {
+      const entry = overrides[i];
+      if (!entry) continue;
+      if (entry.fromDate === oldDate || entry.toDate === oldDate) {
+        entry.fromDate = entry.fromDate || oldDate;
+        entry.toDate = newDate;
+        updated = true;
+        break;
+      }
+    }
+    if (!updated) {
+      overrides.push({ fromDate: oldDate, toDate: newDate });
+    }
+  }
+}
+
+/**
  * Toggle edit mode for the task list. In edit mode the policy, task,
  * periodicity and due date cells become editable inputs. When edit mode
  * is toggled off, changes are saved to localStorage and the list is rebuilt.
@@ -833,6 +1043,14 @@ function toggleEditMode(tasksData) {
  * @param {Array} tasksData Array of task objects
  */
 function addTaskRow(tasksData) {
+  if (editingRowIndex !== null) {
+    alert('Please finish editing the current task before adding a new one.');
+    const activeRow = rowElements[editingRowIndex];
+    if (activeRow) {
+      activeRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return;
+  }
   // Create a new task object with default values
   const today = new Date();
   const yyyy = today.getFullYear();
@@ -843,22 +1061,20 @@ function addTaskRow(tasksData) {
     task: '',
     description: '',
     periodicity: 'MONTHLY',
-    due_date: `${yyyy}-${mm}-${dd}`,
-    initial_due_date: `${yyyy}-${mm}-${dd}`,
+    due_date: '',
+    initial_due_date: '',
     completed_by: '',
-    verified_by: ''
+    verified_by: '',
+    occurrenceOverrides: []
   };
   tasksData.push(newTask);
-  // Record action for undo: addTask at this index
-  actionHistory.push({ type: 'addTask', index: tasksData.length - 1 });
-  // Persist new task to persistent storage so it survives updates
-  try {
-    localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
-  } catch (e) {
-    // ignore storage errors
-  }
-  // Start editing the newly added row
-  editingRowIndex = tasksData.length - 1;
+  const newIndex = tasksData.length - 1;
+  editingRowIndex = newIndex;
+  editingBackup = null;
+  editingDraft = JSON.parse(JSON.stringify(newTask));
+  editingDraft.due_date = `${yyyy}-${mm}-${dd}`;
+  editingDraft.initial_due_date = `${yyyy}-${mm}-${dd}`;
+  editingIsNewTask = true;
   buildTaskList(tasksData);
   renderCalendar(tasksData);
   // Scroll to the newly added row so the user can see it
@@ -879,8 +1095,9 @@ function addTaskRow(tasksData) {
  * @param {string} verBy Name of person verifying the task
  */
 function saveStatus(index, compBy, verBy) {
+  normalizeSavedStructure();
   saved[index] = { completed_by: compBy, verified_by: verBy };
-  localStorage.setItem('taskStatus', JSON.stringify(saved));
+  persistSavedState();
   renderCalendar(tasksData);
 }
 
@@ -989,9 +1206,22 @@ function highlightRow(index) {
  * @param {number} index Row index to edit
  */
 function startEditRow(index) {
+  if (editingRowIndex !== null) {
+    if (editingRowIndex === index) return;
+    alert('Please finish editing the current task before editing another one.');
+    const activeRow = rowElements[editingRowIndex];
+    if (activeRow) {
+      activeRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return;
+  }
   // Before entering edit mode, save a deep copy of the task so it can be
   // restored if the edit is undone later.
   editingBackup = JSON.parse(JSON.stringify(tasksData[index]));
+  editingDraft = JSON.parse(JSON.stringify(tasksData[index]));
+  ensureOverrideArray(editingBackup);
+  ensureOverrideArray(editingDraft);
+  editingIsNewTask = false;
   editingRowIndex = index;
   buildTaskList(tasksData);
   // Ensure the row is visible when editing begins
@@ -1007,13 +1237,25 @@ function startEditRow(index) {
  * @param {number} index Row index being edited
  */
 function finishEditRow(index) {
-  // Record an edit action with the original task prior to editing
-  if (editingBackup) {
-    actionHistory.push({ type: 'editTask', index: index, prevTask: editingBackup });
+  if (editingRowIndex !== index) return;
+  if (!editingDraft) {
+    editingRowIndex = null;
     editingBackup = null;
+    editingIsNewTask = false;
+    return;
   }
-  // Clear editing state
+  const updatedTask = JSON.parse(JSON.stringify(editingDraft));
+  ensureOverrideArray(updatedTask);
+  tasksData[index] = updatedTask;
+  if (editingIsNewTask) {
+    actionHistory.push({ type: 'addTask', index });
+  } else if (editingBackup) {
+    actionHistory.push({ type: 'editTask', index: index, prevTask: editingBackup });
+  }
+  editingBackup = null;
+  editingDraft = null;
   editingRowIndex = null;
+  editingIsNewTask = false;
   // Persist tasksData modifications to persistent storage
   try {
     localStorage.setItem('persistentTasks', JSON.stringify(tasksData));
@@ -1494,12 +1736,18 @@ function undoLastAction() {
       // Remove the added task
       if (typeof action.index === 'number') {
         tasksData.splice(action.index, 1);
+        removeSavedEntry(action.index);
       }
       break;
     case 'deleteTask':
       // Restore the deleted task at its original index
       if (typeof action.index === 'number' && action.task) {
         tasksData.splice(action.index, 0, action.task);
+        if (action.savedSnapshot) {
+          insertSavedEntry(action.index, action.savedSnapshot);
+        } else {
+          insertSavedEntry(action.index, null);
+        }
       }
       break;
     case 'editTask':
@@ -1515,10 +1763,17 @@ function undoLastAction() {
       }
       // Restore the saved names for this task (if available)
       if (typeof action.index === 'number' && action.previousSaved) {
+        normalizeSavedStructure();
         saved[action.index] = {
           completed_by: action.previousSaved.completed_by || '',
           verified_by: action.previousSaved.verified_by || ''
         };
+        persistSavedState();
+      }
+      if (action.removedOverrides && action.removedOverrides.length && tasksData[action.index]) {
+        const task = tasksData[action.index];
+        const overrides = ensureOverrideArray(task);
+        Array.prototype.push.apply(overrides, action.removedOverrides);
       }
       // Remove the most recent completion record matching this index and due date
       for (let i = completedTasks.length - 1; i >= 0; i--) {
@@ -1531,9 +1786,6 @@ function undoLastAction() {
       // Persist updated completed tasks and saved names
       try {
         localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
-      } catch (e) {}
-      try {
-        localStorage.setItem('taskStatus', JSON.stringify(saved));
       } catch (e) {}
       break;
     case 'editHistory':
